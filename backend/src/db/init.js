@@ -150,6 +150,9 @@ async function init() {
       console.log('✓ usuario admin creado (admin@solveit.com / admin1234)');
     }
 
+    // Columna imagen en comentarios del foro
+    await client.query(`ALTER TABLE forum_comments ADD COLUMN IF NOT EXISTS image TEXT`);
+
     console.log('✓ Base de datos inicializada correctamente');
   } finally {
     client.release();

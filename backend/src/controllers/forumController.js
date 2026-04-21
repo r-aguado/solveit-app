@@ -37,7 +37,7 @@ const getPost = async (req, res) => {
 
     const commentsResult = await pool.query(`
       SELECT
-        fc.id, fc.message, fc.created_at,
+        fc.id, fc.message, fc.image, fc.created_at,
         u.id AS user_id, u.name AS user_name, u.profile_photo AS user_photo
       FROM forum_comments fc
       JOIN users u ON fc.user_id = u.id
@@ -90,7 +90,7 @@ const deletePost = async (req, res) => {
 // POST /api/forum/:id/comments — añadir comentario
 const addComment = async (req, res) => {
   const { id } = req.params;
-  const { message } = req.body;
+  const { message, image } = req.body;
   if (!message?.trim()) return res.status(400).json({ message: 'El comentario no puede estar vacío' });
 
   try {
@@ -98,13 +98,13 @@ const addComment = async (req, res) => {
     if (post.rows.length === 0) return res.status(404).json({ message: 'Post no encontrado' });
 
     await pool.query(
-      'INSERT INTO forum_comments (post_id, user_id, message) VALUES ($1, $2, $3)',
-      [id, req.user.id, message.trim()]
+      'INSERT INTO forum_comments (post_id, user_id, message, image) VALUES ($1, $2, $3, $4)',
+      [id, req.user.id, message.trim(), image || null]
     );
 
     // Devolvemos el post actualizado con comentarios
     const commentsResult = await pool.query(`
-      SELECT fc.id, fc.message, fc.created_at,
+      SELECT fc.id, fc.message, fc.image, fc.created_at,
              u.id AS user_id, u.name AS user_name, u.profile_photo AS user_photo
       FROM forum_comments fc
       JOIN users u ON fc.user_id = u.id
