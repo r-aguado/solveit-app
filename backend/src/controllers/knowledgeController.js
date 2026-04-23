@@ -41,13 +41,13 @@ const getOne = async (req, res) => {
 
 // POST /api/knowledge
 const create = async (req, res) => {
-  const { title, content, category_id } = req.body;
+  const { title, content, category_id, cover_image } = req.body;
   if (!title || !content) return res.status(400).json({ message: 'Título y contenido son obligatorios' });
   try {
     const result = await pool.query(
-      `INSERT INTO knowledge_base (title, content, category_id, created_by)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [title, content, category_id || null, req.user.id]
+      `INSERT INTO knowledge_base (title, content, category_id, created_by, cover_image)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [title, content, category_id || null, req.user.id, cover_image || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -57,12 +57,12 @@ const create = async (req, res) => {
 
 // PUT /api/knowledge/:id
 const update = async (req, res) => {
-  const { title, content, category_id } = req.body;
+  const { title, content, category_id, cover_image } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE knowledge_base SET title = $1, content = $2, category_id = $3, updated_at = NOW()
-       WHERE id = $4 RETURNING *`,
-      [title, content, category_id || null, req.params.id]
+      `UPDATE knowledge_base SET title = $1, content = $2, category_id = $3, cover_image = $4, updated_at = NOW()
+       WHERE id = $5 RETURNING *`,
+      [title, content, category_id || null, cover_image || null, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Artículo no encontrado' });
     res.json(result.rows[0]);
