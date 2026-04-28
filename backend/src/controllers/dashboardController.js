@@ -16,7 +16,13 @@ const getStats = async (req, res) => {
       ? `AND i.created_at <= '${dateTo}'`
       : '';
 
-    const techFilter = technicianId ? `AND i.assigned_to = ${parseInt(technicianId)}` : '';
+    // Filtrar por técnico logueado si es técnico, sino mostrar todos (admins)
+    let techFilter = '';
+    if (req.user.role === 'technician') {
+      techFilter = `AND i.assigned_to = ${req.user.id}`;
+    } else if (technicianId) {
+      techFilter = `AND i.assigned_to = ${parseInt(technicianId)}`;
+    }
 
     const [
       total, byStatus, byPriority, byCategory,
@@ -65,7 +71,7 @@ const getStats = async (req, res) => {
           COUNT(i.id) FILTER (WHERE i.priority = 'high') AS high_count
         FROM users u
         LEFT JOIN incidents i ON i.assigned_to = u.id ${dateFilter ? 'AND ' + dateFilter.replace('AND ', '') : ''}
-        WHERE u.role = 'technician' AND u.active = true
+        WHERE u.role = 'technician' AND u.active = true ${req.user.role === 'technician' ? `AND u.id = ${req.user.id}` : ''}
         GROUP BY u.id, u.name, u.profile_photo
         ORDER BY total DESC
       `),
