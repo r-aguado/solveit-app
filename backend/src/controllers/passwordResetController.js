@@ -39,8 +39,8 @@ const requestPasswordReset = async (req, res) => {
 
     // Guardar en BD
     await pool.query(
-      'INSERT INTO password_resets (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [userId, token, expiresAt]
+      'INSERT INTO password_resets (user_id, token, code, expires_at) VALUES ($1, $2, $3, $4)',
+      [userId, token, code, expiresAt]
     );
 
     // Enviar email
@@ -104,8 +104,9 @@ const resetPassword = async (req, res) => {
     const userId = resetRecord.user_id;
 
     // Verificar que el código sea correcto
-    // Nota: En producción, guardarías el código hasheado, aquí lo verificamos en memoria durante 15 min
-    // Por ahora aceptamos cualquier código válido enviado
+    if (resetRecord.code !== code) {
+      return res.status(400).json({ message: 'Código incorrecto' });
+    }
 
     // Hashear nueva contraseña
     const hashedPassword = await bcrypt.hash(newPassword, 10);
