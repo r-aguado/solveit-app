@@ -27,10 +27,10 @@ const getAll = async (req, res) => {
       params.push(req.user.id);
       query += ` AND i.created_by = $${params.length}`;
     }
-    // Si es técnico, ve las asignadas a él y las abiertas
+    // Si es técnico, solo ve las asignadas a él
     if (req.user.role === 'technician') {
       params.push(req.user.id);
-      query += ` AND (i.assigned_to = $${params.length} OR i.status = 'open')`;
+      query += ` AND i.assigned_to = $${params.length}`;
     }
 
     query += ' ORDER BY i.created_at DESC';
