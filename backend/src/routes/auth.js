@@ -11,4 +11,13 @@ router.patch('/profile', verifyToken, updateProfile);
 router.post('/forgot-password', requestPasswordReset);
 router.post('/reset-password', resetPassword);
 
+// Test endpoint
+router.get('/test-email', (req, res) => {
+  res.json({
+    GMAIL_USER: process.env.GMAIL_USER,
+    GMAIL_PASSWORD_SET: !!process.env.GMAIL_PASSWORD,
+    NODE_ENV: process.env.NODE_ENV,
+  });
+});
+
 module.exports = router;
