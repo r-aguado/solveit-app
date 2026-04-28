@@ -3,14 +3,16 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
-// Configurar transporte de email (usando Gmail)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER || 'tu_email@gmail.com',
-    pass: process.env.GMAIL_PASSWORD || 'tu_contraseña_app',
-  },
-});
+// Crear transporte de email dinámicamente
+const getTransporter = () => {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_PASSWORD,
+    },
+  });
+};
 
 // POST /api/auth/forgot-password
 const requestPasswordReset = async (req, res) => {
@@ -58,6 +60,7 @@ const requestPasswordReset = async (req, res) => {
       `,
     };
 
+    const transporter = getTransporter();
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
         console.error('Error al enviar email:', err);
