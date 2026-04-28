@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node index.js)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(npx expo:*)",
+      "Bash(node -e \":*)"
+    ]
+  }
+}

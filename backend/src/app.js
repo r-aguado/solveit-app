@@ -9,6 +9,8 @@ const dashboardRoutes = require('./routes/dashboard');
 const knowledgeRoutes = require('./routes/knowledge');
 const forumRoutes = require('./routes/forum');
 const notificationRoutes = require('./routes/notifications');
+const searchRoutes = require('./routes/search');
+const statsRoutes = require('./routes/stats');
 
 const app = express();
 
@@ -23,6 +25,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/forum', forumRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/stats', statsRoutes);
 
 // Health check
 app.get('/', (req, res) => res.json({ status: 'ok' }));

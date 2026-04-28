@@ -153,6 +153,44 @@ async function init() {
     // Columna imagen en comentarios del foro
     await client.query(`ALTER TABLE forum_comments ADD COLUMN IF NOT EXISTS image TEXT`);
 
+    // Columna cover_image en artículos
+    await client.query(`ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS cover_image TEXT`);
+
+    // Ratings/Reviews de artículos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS knowledge_ratings (
+        id SERIAL PRIMARY KEY,
+        article_id INTEGER REFERENCES knowledge_base(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        review TEXT,
+        created_at TIMESTAMP DEFAULT now(),
+        UNIQUE(article_id, user_id)
+      )
+    `);
+
+    // Reacciones a comentarios del foro
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS forum_reactions (
+        id SERIAL PRIMARY KEY,
+        comment_id INTEGER REFERENCES forum_comments(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        emoji VARCHAR(10) NOT NULL,
+        created_at TIMESTAMP DEFAULT now(),
+        UNIQUE(comment_id, user_id, emoji)
+      )
+    `);
+
+    // Menciones en comentarios del foro
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS forum_mentions (
+        id SERIAL PRIMARY KEY,
+        comment_id INTEGER REFERENCES forum_comments(id) ON DELETE CASCADE,
+        mentioned_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT now()
+      )
+    `);
+
     console.log('✓ Base de datos inicializada correctamente');
   } finally {
     client.release();
