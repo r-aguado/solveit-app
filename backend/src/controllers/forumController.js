@@ -11,9 +11,10 @@ const getPosts = async (req, res) => {
       FROM forum_posts fp
       JOIN users u ON fp.user_id = u.id
       LEFT JOIN forum_comments fc ON fc.post_id = fp.id
+      WHERE fp.company_id = $1
       GROUP BY fp.id, u.name, u.profile_photo
       ORDER BY fp.created_at DESC
-    `);
+    `, [req.companyId]);
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ message: 'Error del servidor', error: err.message });
@@ -30,8 +31,8 @@ const getPost = async (req, res) => {
         u.name AS author_name, u.profile_photo AS author_photo
       FROM forum_posts fp
       JOIN users u ON fp.user_id = u.id
-      WHERE fp.id = $1
-    `, [id]);
+      WHERE fp.company_id = $1 AND fp.id = $2
+    `, [req.companyId, id]);
 
     if (postResult.rows.length === 0) return res.status(404).json({ message: 'Post no encontrado' });
 
@@ -59,9 +60,9 @@ const createPost = async (req, res) => {
   }
   try {
     const result = await pool.query(
-      `INSERT INTO forum_posts (title, content, user_id) VALUES ($1, $2, $3)
+      `INSERT INTO forum_posts (title, content, user_id, company_id) VALUES ($1, $2, $3, $4)
        RETURNING id, title, content, created_at`,
-      [title.trim(), content.trim(), req.user.id]
+      [title.trim(), content.trim(), req.user.id, req.companyId]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -73,14 +74,14 @@ const createPost = async (req, res) => {
 const deletePost = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query('SELECT user_id FROM forum_posts WHERE id = $1', [id]);
+    const result = await pool.query('SELECT user_id FROM forum_posts WHERE company_id = $1 AND id = $2', [req.companyId, id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Post no encontrado' });
 
     if (result.rows[0].user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Sin permisos para eliminar este post' });
     }
 
-    await pool.query('DELETE FROM forum_posts WHERE id = $1', [id]);
+    await pool.query('DELETE FROM forum_posts WHERE company_id = $1 AND id = $2', [req.companyId, id]);
     res.json({ message: 'Post eliminado' });
   } catch (err) {
     res.status(500).json({ message: 'Error del servidor', error: err.message });
@@ -94,7 +95,7 @@ const addComment = async (req, res) => {
   if (!message?.trim()) return res.status(400).json({ message: 'El comentario no puede estar vacío' });
 
   try {
-    const post = await pool.query('SELECT id FROM forum_posts WHERE id = $1', [id]);
+    const post = await pool.query('SELECT id FROM forum_posts WHERE company_id = $1 AND id = $2', [req.companyId, id]);
     if (post.rows.length === 0) return res.status(404).json({ message: 'Post no encontrado' });
 
     await pool.query(
@@ -122,7 +123,11 @@ const addComment = async (req, res) => {
 const deleteComment = async (req, res) => {
   const { commentId } = req.params;
   try {
-    const result = await pool.query('SELECT user_id FROM forum_comments WHERE id = $1', [commentId]);
+    const result = await pool.query(`
+      SELECT fc.user_id FROM forum_comments fc
+      JOIN forum_posts fp ON fc.post_id = fp.id
+      WHERE fc.id = $1 AND fp.company_id = $2
+    `, [commentId, req.companyId]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Comentario no encontrado' });
 
     if (result.rows[0].user_id !== req.user.id && req.user.role !== 'admin') {

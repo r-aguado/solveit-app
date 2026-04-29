@@ -9,9 +9,9 @@ const getAll = async (req, res) => {
       FROM knowledge_base kb
       LEFT JOIN categories c ON kb.category_id = c.id
       LEFT JOIN users u ON kb.created_by = u.id
-      WHERE 1=1
+      WHERE kb.company_id = $1
     `;
-    const params = [];
+    const params = [req.companyId];
     if (category_id) { params.push(category_id); query += ` AND kb.category_id = $${params.length}`; }
     if (q) { params.push(`%${q}%`); query += ` AND (kb.title ILIKE $${params.length} OR kb.content ILIKE $${params.length})`; }
     query += ' ORDER BY kb.created_at DESC';
@@ -30,8 +30,8 @@ const getOne = async (req, res) => {
       FROM knowledge_base kb
       LEFT JOIN categories c ON kb.category_id = c.id
       LEFT JOIN users u ON kb.created_by = u.id
-      WHERE kb.id = $1
-    `, [req.params.id]);
+      WHERE kb.company_id = $1 AND kb.id = $2
+    `, [req.companyId, req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Artículo no encontrado' });
     res.json(result.rows[0]);
   } catch (err) {
@@ -45,9 +45,9 @@ const create = async (req, res) => {
   if (!title || !content) return res.status(400).json({ message: 'Título y contenido son obligatorios' });
   try {
     const result = await pool.query(
-      `INSERT INTO knowledge_base (title, content, category_id, created_by, cover_image)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [title, content, category_id || null, req.user.id, cover_image || null]
+      `INSERT INTO knowledge_base (title, content, category_id, created_by, cover_image, company_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [title, content, category_id || null, req.user.id, cover_image || null, req.companyId]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -61,8 +61,8 @@ const update = async (req, res) => {
   try {
     const result = await pool.query(
       `UPDATE knowledge_base SET title = $1, content = $2, category_id = $3, cover_image = $4, updated_at = NOW()
-       WHERE id = $5 RETURNING *`,
-      [title, content, category_id || null, cover_image || null, req.params.id]
+       WHERE company_id = $5 AND id = $6 RETURNING *`,
+      [title, content, category_id || null, cover_image || null, req.companyId, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Artículo no encontrado' });
     res.json(result.rows[0]);
@@ -74,7 +74,7 @@ const update = async (req, res) => {
 // DELETE /api/knowledge/:id
 const remove = async (req, res) => {
   try {
-    await pool.query('DELETE FROM knowledge_base WHERE id = $1', [req.params.id]);
+    await pool.query('DELETE FROM knowledge_base WHERE company_id = $1 AND id = $2', [req.companyId, req.params.id]);
     res.json({ message: 'Artículo eliminado' });
   } catch (err) {
     res.status(500).json({ message: 'Error del servidor', error: err.message });

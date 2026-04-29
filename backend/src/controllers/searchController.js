@@ -13,30 +13,30 @@ const globalSearch = async (req, res) => {
       pool.query(`
         SELECT id, title, status, priority, category_id, category_name
         FROM incidents_view
-        WHERE title ILIKE $1 OR description ILIKE $1
+        WHERE company_id = $1 AND (title ILIKE $2 OR description ILIKE $2)
         LIMIT 10
-      `, [searchTerm]),
+      `, [req.companyId, searchTerm]),
       pool.query(`
         SELECT kb.id, kb.title, kb.cover_image, c.name AS category_name
         FROM knowledge_base kb
         LEFT JOIN categories c ON kb.category_id = c.id
-        WHERE kb.title ILIKE $1 OR kb.content ILIKE $1
+        WHERE kb.company_id = $1 AND (kb.title ILIKE $2 OR kb.content ILIKE $2)
         LIMIT 10
-      `, [searchTerm]),
+      `, [req.companyId, searchTerm]),
       pool.query(`
         SELECT fp.id, fp.title, COUNT(fc.id) AS comment_count
         FROM forum_posts fp
         LEFT JOIN forum_comments fc ON fp.id = fc.post_id
-        WHERE fp.title ILIKE $1 OR fp.description ILIKE $1
+        WHERE fp.company_id = $1 AND (fp.title ILIKE $2 OR fp.description ILIKE $2)
         GROUP BY fp.id
         LIMIT 10
-      `, [searchTerm]),
+      `, [req.companyId, searchTerm]),
       pool.query(`
         SELECT id, name, email, role
         FROM users
-        WHERE name ILIKE $1 OR email ILIKE $1
+        WHERE company_id = $1 AND (name ILIKE $2 OR email ILIKE $2)
         LIMIT 5
-      `, [searchTerm]),
+      `, [req.companyId, searchTerm]),
     ]);
 
     res.json({

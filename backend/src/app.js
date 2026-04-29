@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
+const companiesRoutes = require('./routes/companies');
 const incidentRoutes = require('./routes/incidents');
 const userRoutes = require('./routes/users');
 const dashboardRoutes = require('./routes/dashboard');
@@ -19,6 +20,7 @@ app.use(express.json({ limit: '10mb' })); // Necesario para fotos de perfil en b
 
 // Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/companies', companiesRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);

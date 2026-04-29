@@ -56,13 +56,13 @@ const markAllRead = async (req, res) => {
 };
 
 // Helper para crear notificaciones desde otros controladores
-const createNotification = async (userId, title, body, type, incidentId = null) => {
+const createNotification = async (userId, title, body, type, incidentId = null, companyId = null) => {
   if (!userId) return;
   try {
     await pool.query(
-      `INSERT INTO notifications (user_id, title, body, type, incident_id)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [userId, title, body, type, incidentId]
+      `INSERT INTO notifications (user_id, title, body, type, incident_id, company_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId, title, body, type, incidentId, companyId]
     );
   } catch (err) {
     console.error('Error creando notificación:', err.message);

@@ -39,7 +39,12 @@ const login = async (req, res) => {
   }
 
   try {
-    const result = await pool.query('SELECT * FROM users WHERE email = $1 AND active = true', [email]);
+    const result = await pool.query(
+      `SELECT u.*, c.name as company_name FROM users u
+       LEFT JOIN companies c ON u.company_id = c.id
+       WHERE u.email = $1 AND u.active = true`,
+      [email]
+    );
     if (result.rows.length === 0) {
       return res.status(401).json({ message: 'Credenciales incorrectas' });
     }
@@ -51,14 +56,23 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
+      { id: user.id, email: user.email, role: user.role, name: user.name, company_id: user.company_id },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, department: user.department, profile_photo: user.profile_photo }
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        profile_photo: user.profile_photo,
+        company_id: user.company_id,
+        company_name: user.company_name
+      }
     });
   } catch (err) {
     res.status(500).json({ message: 'Error del servidor', error: err.message });
@@ -69,7 +83,10 @@ const login = async (req, res) => {
 const me = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, role, department, profile_photo, created_at FROM users WHERE id = $1',
+      `SELECT u.id, u.name, u.email, u.role, u.department, u.profile_photo, u.created_at, u.company_id, c.name as company_name
+       FROM users u
+       LEFT JOIN companies c ON u.company_id = c.id
+       WHERE u.id = $1`,
       [req.user.id]
     );
     res.json(result.rows[0]);
@@ -102,7 +119,7 @@ const updateProfile = async (req, res) => {
            password = $3,
            profile_photo = COALESCE($4, profile_photo)
        WHERE id = $5
-       RETURNING id, name, email, role, department, profile_photo`,
+       RETURNING id, name, email, role, department, profile_photo, company_id`,
       [name || user.name, department !== undefined ? department : user.department, hashedPassword, profile_photo || null, req.user.id]
     );
 

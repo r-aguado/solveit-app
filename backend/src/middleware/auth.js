@@ -27,4 +27,7 @@ const verifyRole = (...roles) => {
   };
 };
 
-module.exports = { verifyToken, verifyRole };
+// Alias semántico para SuperAdmin
+const verifySuperAdmin = verifyRole('superadmin');
+
+module.exports = { verifyToken, verifyRole, verifySuperAdmin };

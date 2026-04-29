@@ -13,8 +13,8 @@ const getUserStats = async (req, res) => {
         COUNT(CASE WHEN status = 'open' THEN 1 END) as open,
         COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress
       FROM incidents
-      WHERE created_by = $1
-    `, [userId]);
+      WHERE company_id = $1 AND created_by = $2
+    `, [req.companyId, userId]);
 
     // Incidencias asignadas al usuario (si es técnico)
     const assignedIncidents = await pool.query(`
@@ -25,16 +25,16 @@ const getUserStats = async (req, res) => {
         COUNT(CASE WHEN status = 'open' THEN 1 END) as open,
         COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress
       FROM incidents
-      WHERE assigned_to = $1
-    `, [userId]);
+      WHERE company_id = $1 AND assigned_to = $2
+    `, [req.companyId, userId]);
 
     // Tiempo promedio de resolución
     const avgResolutionTime = await pool.query(`
       SELECT
         ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/3600)::numeric, 1) as avg_hours
       FROM incidents
-      WHERE (assigned_to = $1 OR created_by = $1) AND resolved_at IS NOT NULL
-    `, [userId]);
+      WHERE company_id = $1 AND (assigned_to = $2 OR created_by = $2) AND resolved_at IS NOT NULL
+    `, [req.companyId, userId]);
 
     // Incidencias comentadas
     const commentCount = await pool.query(`
@@ -43,8 +43,8 @@ const getUserStats = async (req, res) => {
 
     // Artículos creados
     const articleCount = await pool.query(`
-      SELECT COUNT(*) as total FROM knowledge_base WHERE created_by = $1
-    `, [userId]);
+      SELECT COUNT(*) as total FROM knowledge_base WHERE company_id = $1 AND created_by = $2
+    `, [req.companyId, userId]);
 
     // Comentarios en foro
     const forumCommentCount = await pool.query(`

@@ -30,32 +30,32 @@ const getStats = async (req, res) => {
       overdue, recentActivity, slaCompliance
     ] = await Promise.all([
 
-      pool.query(`SELECT COUNT(*) AS total FROM incidents i WHERE 1=1 ${dateFilter} ${techFilter}`),
+      pool.query(`SELECT COUNT(*) AS total FROM incidents i WHERE i.company_id = $1 ${dateFilter} ${techFilter}`, [req.companyId]),
 
       pool.query(`
         SELECT status, COUNT(*) AS count
-        FROM incidents i WHERE 1=1 ${dateFilter} ${techFilter}
+        FROM incidents i WHERE i.company_id = $1 ${dateFilter} ${techFilter}
         GROUP BY status
-      `),
+      `, [req.companyId]),
 
       pool.query(`
         SELECT priority, COUNT(*) AS count
-        FROM incidents i WHERE 1=1 ${dateFilter} ${techFilter}
+        FROM incidents i WHERE i.company_id = $1 ${dateFilter} ${techFilter}
         GROUP BY priority
-      `),
+      `, [req.companyId]),
 
       pool.query(`
         SELECT c.name, COUNT(i.id) AS count
-        FROM categories c LEFT JOIN incidents i ON i.category_id = c.id
+        FROM categories c LEFT JOIN incidents i ON i.category_id = c.id AND i.company_id = $1
         WHERE 1=1 ${dateFilter.replace(/i\./g, 'i.')} ${techFilter.replace(/i\./g, 'i.')}
         GROUP BY c.name ORDER BY count DESC
-      `),
+      `, [req.companyId]),
 
       pool.query(`
         SELECT ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/3600), 1) AS avg_hours
         FROM incidents i
-        WHERE status = 'resolved' AND resolved_at IS NOT NULL ${dateFilter} ${techFilter}
-      `),
+        WHERE i.company_id = $1 AND status = 'resolved' AND resolved_at IS NOT NULL ${dateFilter} ${techFilter}
+      `, [req.companyId]),
 
       pool.query(`
         SELECT
@@ -70,16 +70,16 @@ const getStats = async (req, res) => {
           COUNT(i.id) FILTER (WHERE i.priority = 'critical') AS critical_count,
           COUNT(i.id) FILTER (WHERE i.priority = 'high') AS high_count
         FROM users u
-        LEFT JOIN incidents i ON i.assigned_to = u.id ${dateFilter ? 'AND ' + dateFilter.replace('AND ', '') : ''}
-        WHERE u.role = 'technician' AND u.active = true ${req.user.role === 'technician' ? `AND u.id = ${req.user.id}` : ''}
+        LEFT JOIN incidents i ON i.assigned_to = u.id AND i.company_id = $1 ${dateFilter ? 'AND ' + dateFilter.replace('AND ', '') : ''}
+        WHERE u.company_id = $1 AND u.role = 'technician' AND u.active = true ${req.user.role === 'technician' ? `AND u.id = ${req.user.id}` : ''}
         GROUP BY u.id, u.name, u.profile_photo
         ORDER BY total DESC
-      `),
+      `, [req.companyId]),
 
       pool.query(`
         SELECT COUNT(*) AS count FROM incidents i
-        WHERE assigned_to IS NULL AND status = 'open' ${dateFilter}
-      `),
+        WHERE i.company_id = $1 AND assigned_to IS NULL AND status = 'open' ${dateFilter}
+      `, [req.companyId]),
 
       // Incidencias vencidas (abiertas/en progreso que superan el SLA)
       pool.query(`
@@ -88,17 +88,17 @@ const getStats = async (req, res) => {
                COUNT(*) FILTER (WHERE priority = 'medium'   AND EXTRACT(EPOCH FROM (NOW() - created_at))/3600 > 24) AS medium_overdue,
                COUNT(*) FILTER (WHERE priority = 'low'      AND EXTRACT(EPOCH FROM (NOW() - created_at))/3600 > 72) AS low_overdue
         FROM incidents i
-        WHERE status IN ('open', 'in_progress') ${dateFilter} ${techFilter}
-      `),
+        WHERE i.company_id = $1 AND status IN ('open', 'in_progress') ${dateFilter} ${techFilter}
+      `, [req.companyId]),
 
       // Actividad reciente: incidencias por día (últimos 7 días)
       pool.query(`
         SELECT DATE(created_at) AS day, COUNT(*) AS count
         FROM incidents i
-        WHERE created_at >= NOW() - INTERVAL '7 days' ${techFilter}
+        WHERE i.company_id = $1 AND created_at >= NOW() - INTERVAL '7 days' ${techFilter}
         GROUP BY DATE(created_at)
         ORDER BY day ASC
-      `),
+      `, [req.companyId]),
 
       // SLA compliance: % de incidencias resueltas dentro del SLA
       pool.query(`
@@ -112,9 +112,9 @@ const getStats = async (req, res) => {
             (priority = 'low'      AND EXTRACT(EPOCH FROM (resolved_at - created_at))/3600 <= 72)
           ) AS within_sla
         FROM incidents i
-        WHERE status = 'resolved' AND resolved_at IS NOT NULL ${dateFilter} ${techFilter}
+        WHERE i.company_id = $1 AND status = 'resolved' AND resolved_at IS NOT NULL ${dateFilter} ${techFilter}
         GROUP BY priority
-      `)
+      `, [req.companyId])
     ]);
 
     // Calcular SLA compliance por técnico
@@ -135,8 +135,8 @@ const getStats = async (req, res) => {
             (priority = 'low'      AND EXTRACT(EPOCH FROM (NOW() - created_at))/3600 > 72)
           )) AS overdue
         FROM incidents
-        WHERE assigned_to = $1 ${dateFilter}
-      `, [t.id]);
+        WHERE company_id = $1 AND assigned_to = $2 ${dateFilter}
+      `, [req.companyId, t.id]);
 
       const r = sla.rows[0];
       const slaRate = parseInt(r.resolved_total) > 0

@@ -14,9 +14,9 @@ const getAll = async (req, res) => {
       LEFT JOIN users u1 ON i.created_by = u1.id
       LEFT JOIN users u2 ON i.assigned_to = u2.id
       LEFT JOIN categories c ON i.category_id = c.id
-      WHERE 1=1
+      WHERE i.company_id = $1
     `;
-    const params = [];
+    const params = [req.companyId];
 
     if (status) { params.push(status); query += ` AND i.status = $${params.length}`; }
     if (priority) { params.push(priority); query += ` AND i.priority = $${params.length}`; }
@@ -54,8 +54,8 @@ const getOne = async (req, res) => {
       LEFT JOIN users u1 ON i.created_by = u1.id
       LEFT JOIN users u2 ON i.assigned_to = u2.id
       LEFT JOIN categories c ON i.category_id = c.id
-      WHERE i.id = $1
-    `, [req.params.id]);
+      WHERE i.company_id = $1 AND i.id = $2
+    `, [req.companyId, req.params.id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Incidencia no encontrada' });
@@ -85,9 +85,9 @@ const assignTechnician = async (req, res) => {
   const { technician_id } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE incidents SET assigned_to = $1, updated_at = NOW() WHERE id = $2
+      `UPDATE incidents SET assigned_to = $1, updated_at = NOW() WHERE company_id = $2 AND id = $3
        RETURNING *`,
-      [technician_id || null, req.params.id]
+      [technician_id || null, req.companyId, req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Incidencia no encontrada' });
 
@@ -99,7 +99,8 @@ const assignTechnician = async (req, res) => {
         'Nueva incidencia asignada',
         `Se te ha asignado: "${inc.title}"`,
         'incident_assigned',
-        inc.id
+        inc.id,
+        req.companyId
       );
     }
 
@@ -121,20 +122,20 @@ const create = async (req, res) => {
     // Asignación automática: técnico con menos incidencias activas
     const techResult = await pool.query(`
       SELECT u.id FROM users u
-      LEFT JOIN incidents i ON i.assigned_to = u.id AND i.status IN ('open', 'in_progress')
-      WHERE u.role = 'technician' AND u.active = true
+      LEFT JOIN incidents i ON i.assigned_to = u.id AND i.status IN ('open', 'in_progress') AND i.company_id = $1
+      WHERE u.role = 'technician' AND u.active = true AND u.company_id = $1
       GROUP BY u.id
       ORDER BY COUNT(i.id) ASC
       LIMIT 1
-    `);
+    `, [req.companyId]);
 
     const assignedTo = techResult.rows.length > 0 ? techResult.rows[0].id : null;
 
     const result = await pool.query(`
-      INSERT INTO incidents (title, description, priority, category_id, created_by, assigned_to)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO incidents (title, description, priority, category_id, created_by, assigned_to, company_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
-    `, [title, description, priority || 'medium', category_id, req.user.id, assignedTo]);
+    `, [title, description, priority || 'medium', category_id, req.user.id, assignedTo, req.companyId]);
 
     const incident = result.rows[0];
 
@@ -165,15 +166,15 @@ const updateStatus = async (req, res) => {
   }
 
   try {
-    const current = await pool.query('SELECT * FROM incidents WHERE id = $1', [req.params.id]);
+    const current = await pool.query('SELECT * FROM incidents WHERE company_id = $1 AND id = $2', [req.companyId, req.params.id]);
     if (current.rows.length === 0) return res.status(404).json({ message: 'Incidencia no encontrada' });
 
     const oldStatus = current.rows[0].status;
     const resolvedAt = status === 'resolved' ? new Date() : null;
 
     await pool.query(`
-      UPDATE incidents SET status = $1, updated_at = NOW(), resolved_at = $2 WHERE id = $3
-    `, [status, resolvedAt, req.params.id]);
+      UPDATE incidents SET status = $1, updated_at = NOW(), resolved_at = $2 WHERE company_id = $3 AND id = $4
+    `, [status, resolvedAt, req.companyId, req.params.id]);
 
     // Guardar en historial
     await pool.query(`
@@ -221,7 +222,7 @@ const addComment = async (req, res) => {
     `, [req.params.id, req.user.id, message]);
 
     // Notificar al creador y al técnico asignado (si no son quien comenta)
-    const incData = await pool.query('SELECT title, created_by, assigned_to FROM incidents WHERE id = $1', [req.params.id]);
+    const incData = await pool.query('SELECT title, created_by, assigned_to FROM incidents WHERE company_id = $1 AND id = $2', [req.companyId, req.params.id]);
     if (incData.rows.length > 0) {
       const { title, created_by, assigned_to } = incData.rows[0];
       const notified = new Set([req.user.id]);
