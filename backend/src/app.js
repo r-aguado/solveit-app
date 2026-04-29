@@ -12,6 +12,7 @@ const forumRoutes = require('./routes/forum');
 const notificationRoutes = require('./routes/notifications');
 const searchRoutes = require('./routes/search');
 const statsRoutes = require('./routes/stats');
+const aiRoutes = require('./routes/ai');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/forum', forumRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/', (req, res) => res.json({ status: 'ok' }));
