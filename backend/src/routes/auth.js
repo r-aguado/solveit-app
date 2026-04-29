@@ -20,4 +20,14 @@ router.get('/test-email', (req, res) => {
   });
 });
 
+router.get('/test-password-resets', async (req, res) => {
+  const pool = require('../db');
+  try {
+    const result = await pool.query('SELECT * FROM password_resets LIMIT 5');
+    res.json({ table_exists: true, records: result.rows });
+  } catch (err) {
+    res.json({ table_exists: false, error: err.message });
+  }
+});
+
 module.exports = router;

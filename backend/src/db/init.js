@@ -313,6 +313,19 @@ async function init() {
       )
     `);
 
+    // Recuperación de contraseña
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL,
+        used BOOLEAN DEFAULT false,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT now()
+      )
+    `);
+
     console.log('✓ Base de datos inicializada correctamente');
   } finally {
     client.release();

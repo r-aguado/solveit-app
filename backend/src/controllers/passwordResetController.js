@@ -38,10 +38,17 @@ const requestPasswordReset = async (req, res) => {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
 
     // Guardar en BD
-    await pool.query(
-      'INSERT INTO password_resets (user_id, token, code, expires_at) VALUES ($1, $2, $3, $4)',
-      [userId, token, code, expiresAt]
-    );
+    console.log('Guardando reset:', { userId, token: token.substring(0, 10), code, expiresAt });
+    try {
+      const insertResult = await pool.query(
+        'INSERT INTO password_resets (user_id, token, code, expires_at) VALUES ($1, $2, $3, $4)',
+        [userId, token, code, expiresAt]
+      );
+      console.log('Reset guardado exitosamente. Rows affected:', insertResult.rowCount);
+    } catch (insertErr) {
+      console.error('ERROR EN INSERT:', insertErr.message);
+      throw insertErr;
+    }
 
     // Enviar email
     const mailOptions = {
@@ -61,13 +68,18 @@ const requestPasswordReset = async (req, res) => {
     };
 
     const transporter = getTransporter();
-    transporter.sendMail(mailOptions, (err, info) => {
-      if (err) {
-        console.error('Error al enviar email:', err);
-        return res.status(500).json({ message: 'Error al enviar el email', error: err.message });
-      }
-      res.json({ message: 'Código enviado a tu email', token });
+    await new Promise((resolve, reject) => {
+      transporter.sendMail(mailOptions, (err, info) => {
+        if (err) {
+          console.error('Error al enviar email:', err);
+          reject(err);
+        } else {
+          resolve(info);
+        }
+      });
     });
+
+    res.json({ message: 'Código enviado a tu email', token });
   } catch (err) {
     res.status(500).json({ message: 'Error del servidor', error: err.message });
   }
@@ -104,7 +116,7 @@ const resetPassword = async (req, res) => {
     const userId = resetRecord.user_id;
 
     // Verificar que el código sea correcto
-    if (resetRecord.code !== code) {
+    if (resetRecord.code !== code.toString()) {
       return res.status(400).json({ message: 'Código incorrecto' });
     }
 
