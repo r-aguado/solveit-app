@@ -7,9 +7,11 @@ interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'technician' | 'user';
+  role: 'superadmin' | 'admin' | 'technician' | 'user';
   department?: string;
   profile_photo?: string;
+  company_id?: number | null;
+  company_name?: string;
 }
 
 interface AuthContextType {

@@ -57,6 +57,16 @@ const NAV_ITEMS = [
     ),
     roles: ['admin'],
   },
+  {
+    href: '/empresas',
+    label: 'Empresas',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6 19.5v-14m0-1.5C6 3.75 7.5 2.25 9 2.25h6c1.5 0 3 1.5 3 3v14c0 1.5-1.5 3-3 3H9c-1.5 0-3-1.5-3-3V3.75Z" />
+      </svg>
+    ),
+    roles: ['superadmin'],
+  },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
