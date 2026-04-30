@@ -326,6 +326,18 @@ async function init() {
       )
     `);
 
+    // Historial de conversaciones IA
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_conversations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        company_id INTEGER REFERENCES companies(id),
+        question TEXT NOT NULL,
+        response TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT now()
+      )
+    `);
+
     console.log('✓ Base de datos inicializada correctamente');
   } finally {
     client.release();

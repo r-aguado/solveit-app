@@ -1,8 +1,8 @@
 const pool = require('../db');
 const axios = require('axios');
 
-const OLLAMA_URL = 'http://localhost:11434/api/generate';
-const OLLAMA_MODEL = 'mistral';
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'mistral';
 
 // POST /api/knowledge/ask-ai
 const askAI = async (req, res) => {
@@ -40,13 +40,23 @@ const askAI = async (req, res) => {
     context += 'RESPUESTA:';
 
     // Llamar a Ollama
-    const response = await axios.post(OLLAMA_URL, {
-      model: OLLAMA_MODEL,
-      prompt: context,
-      stream: false
-    }, { timeout: 60000 });
-
-    const aiResponse = response.data.response.trim();
+    let aiResponse;
+    try {
+      const response = await axios.post(OLLAMA_URL, {
+        model: OLLAMA_MODEL,
+        prompt: context,
+        stream: false
+      }, { timeout: 60000 });
+      aiResponse = response.data.response.trim();
+    } catch (ollamaErr) {
+      // Fallback: proporcionar respuesta basada en KB cuando Ollama no está disponible
+      console.warn('Ollama no disponible, usando respuesta basada en KB:', ollamaErr.message);
+      if (kbArticles.rows.length > 0) {
+        aiResponse = `Basándome en la base de conocimiento encontré lo siguiente:\n\n${kbArticles.rows.map((a, i) => `${i + 1}. ${a.title}`).join('\n')}\n\nPara una respuesta más detallada, asegúrate de que Ollama esté configurado correctamente.`;
+      } else {
+        throw ollamaErr;
+      }
+    }
 
     // Guardar pregunta/respuesta (opcional)
     await pool.query(
@@ -69,7 +79,13 @@ const askAI = async (req, res) => {
       });
     }
 
-    res.status(500).json({ message: 'Error al procesar la pregunta', error: err.message });
+    const isConnectionError = err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND';
+    const statusCode = isConnectionError ? 503 : 500;
+    const message = isConnectionError
+      ? 'Servicio de IA no disponible. Configura OLLAMA_URL en variables de entorno.'
+      : 'Error al procesar la pregunta';
+
+    res.status(statusCode).json({ message, error: err.message });
   }
 };
 
