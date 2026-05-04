@@ -1,9 +1,7 @@
 const pool = require('../db');
-const { OpenAI } = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const askAI = async (req, res) => {
   const { question } = req.body;
@@ -36,20 +34,11 @@ const askAI = async (req, res) => {
       systemPrompt += 'No hay artículos específicos en la base de datos, responde según tu conocimiento general de IT de manera profesional y útil.';
     }
 
-    // Llamar a OpenAI
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: question,
-        },
-      ],
-    });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const fullPrompt = systemPrompt + '\n\nPREGUNTA: ' + question;
 
-    const aiResponse = response.choices[0].message.content;
+    const result = await model.generateContent(fullPrompt);
+    const aiResponse = result.response.text();
 
     // Guardar pregunta/respuesta
     await pool.query(
@@ -65,10 +54,10 @@ const askAI = async (req, res) => {
     });
   } catch (err) {
     console.error('Error en AI Assistant:', err.message);
-    const statusCode = err.status || 500;
-    const message = err.status === 401
-      ? 'API key de OpenAI inválida'
-      : err.status === 429
+    const statusCode = err.status === 400 ? 400 : err.status === 403 ? 403 : 500;
+    const message = err.message.includes('API key')
+      ? 'API key de Gemini inválida'
+      : err.message.includes('quota')
       ? 'Límite de requests alcanzado. Intenta de nuevo más tarde.'
       : 'Error al procesar la pregunta';
 
