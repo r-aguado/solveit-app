@@ -34,7 +34,7 @@ const askAI = async (req, res) => {
 
     prompt += `\nPregunta del usuario: ${question}`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-12b-it:generateContent?key=${apiKey}`;
 
     const response = await axios.post(url, {
       contents: [{ parts: [{ text: prompt }] }]
