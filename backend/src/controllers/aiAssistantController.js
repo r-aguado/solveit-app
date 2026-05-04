@@ -1,10 +1,10 @@
 const pool = require('../db');
-const axios = require('axios');
+const OpenAI = require('openai');
 
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'mistral';
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-// POST /api/knowledge/ask-ai
 const askAI = async (req, res) => {
   const { question } = req.body;
   const companyId = req.companyId;
@@ -25,45 +25,38 @@ const askAI = async (req, res) => {
     );
 
     // Preparar contexto con artículos relevantes
-    let context = 'Eres un asistente de soporte IT. Responde preguntas basándote en la siguiente información de la base de conocimiento:\n\n';
+    let systemPrompt = 'Eres un asistente de soporte IT profesional. Responde preguntas basándote en la siguiente información de la base de conocimiento cuando sea relevante:\n\n';
 
     if (kbArticles.rows.length > 0) {
-      context += 'INFORMACIÓN RELEVANTE:\n';
+      systemPrompt += 'INFORMACIÓN DE LA BASE DE CONOCIMIENTO:\n';
       kbArticles.rows.forEach((article, index) => {
-        context += `\n${index + 1}. ${article.title}\n${article.content}\n`;
+        systemPrompt += `\n${index + 1}. ${article.title}\n${article.content}\n`;
       });
     } else {
-      context += 'No hay artículos específicos en la base de datos, pero responde según tu conocimiento general de IT.\n';
+      systemPrompt += 'No hay artículos específicos en la base de datos, responde según tu conocimiento general de IT de manera profesional y útil.';
     }
 
-    context += `\nPREGUNTA DEL USUARIO: ${question}\n`;
-    context += 'RESPUESTA:';
+    // Llamar a OpenAI
+    const response = await client.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: question,
+        },
+      ],
+    });
 
-    // Llamar a Ollama
-    let aiResponse;
-    try {
-      const response = await axios.post(OLLAMA_URL, {
-        model: OLLAMA_MODEL,
-        prompt: context,
-        stream: false
-      }, { timeout: 60000 });
-      aiResponse = response.data.response.trim();
-    } catch (ollamaErr) {
-      // Fallback: proporcionar respuesta basada en KB cuando Ollama no está disponible
-      console.warn('Ollama no disponible, usando respuesta basada en KB:', ollamaErr.message);
-      if (kbArticles.rows.length > 0) {
-        aiResponse = `Basándome en la base de conocimiento encontré lo siguiente:\n\n${kbArticles.rows.map((a, i) => `${i + 1}. ${a.title}`).join('\n')}\n\nPara una respuesta más detallada, asegúrate de que Ollama esté configurado correctamente.`;
-      } else {
-        aiResponse = `Tu pregunta: "${question}"\n\nRespuesta: En este momento, el servicio de IA está en modo de demostración. Para obtener respuestas personalizadas, asegúrate de tener artículos en la base de conocimiento o configura un servidor Ollama.\n\nConsejo: Agrega artículos a la base de conocimiento para mejorar las respuestas del asistente.`;
-      }
-    }
+    const aiResponse = response.content[0].text;
 
-    // Guardar pregunta/respuesta (opcional)
+    // Guardar pregunta/respuesta
     await pool.query(
       `INSERT INTO ai_conversations (user_id, company_id, question, response, created_at)
        VALUES ($1, $2, $3, $4, NOW())`,
       [req.user.id, companyId, question, aiResponse]
-    ).catch(() => {}); // Ignorar si la tabla no existe
+    ).catch(() => {});
 
     res.json({
       question,
@@ -72,10 +65,11 @@ const askAI = async (req, res) => {
     });
   } catch (err) {
     console.error('Error en AI Assistant:', err.message);
-    const isConnectionError = err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND';
-    const statusCode = isConnectionError ? 503 : 500;
-    const message = isConnectionError
-      ? 'Servicio de IA no disponible. Intenta de nuevo más tarde.'
+    const statusCode = err.status || 500;
+    const message = err.status === 401
+      ? 'API key de OpenAI inválida'
+      : err.status === 429
+      ? 'Límite de requests alcanzado. Intenta de nuevo más tarde.'
       : 'Error al procesar la pregunta';
 
     res.status(statusCode).json({ message, error: err.message });
