@@ -67,13 +67,24 @@ const requestPasswordReset = async (req, res) => {
       `,
     };
 
+    console.log('Configuración Gmail:', {
+      hasUser: !!process.env.GMAIL_USER,
+      hasPass: !!process.env.GMAIL_PASSWORD,
+      user: process.env.GMAIL_USER,
+      passLength: process.env.GMAIL_PASSWORD?.length
+    });
+
     const transporter = getTransporter();
     await new Promise((resolve, reject) => {
       transporter.sendMail(mailOptions, (err, info) => {
         if (err) {
-          console.error('Error al enviar email:', err);
+          console.error('Error al enviar email - Code:', err.code);
+          console.error('Error al enviar email - Message:', err.message);
+          console.error('Error al enviar email - Response:', err.response);
+          console.error('Error completo:', JSON.stringify(err, null, 2));
           reject(err);
         } else {
+          console.log('Email enviado exitosamente:', info.response);
           resolve(info);
         }
       });
@@ -81,6 +92,7 @@ const requestPasswordReset = async (req, res) => {
 
     res.json({ message: 'Código enviado a tu email', token });
   } catch (err) {
+    console.error('CATCH password reset error:', err.message);
     res.status(500).json({ message: 'Error del servidor', error: err.message });
   }
 };
