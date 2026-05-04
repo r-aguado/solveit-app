@@ -1,23 +1,9 @@
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-// Crear transporte de email dinámicamente
-const getTransporter = () => {
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASSWORD,
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  });
-};
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // POST /api/auth/forgot-password
 const requestPasswordReset = async (req, res) => {
@@ -55,9 +41,10 @@ const requestPasswordReset = async (req, res) => {
       throw insertErr;
     }
 
-    // Enviar email
-    const mailOptions = {
-      from: process.env.GMAIL_USER || 'noreply@solveit.com',
+    // Enviar email con Resend
+    console.log('Enviando email con Resend a:', email);
+    const { data, error } = await resend.emails.send({
+      from: 'SolveIT <onboarding@resend.dev>',
       to: email,
       subject: 'Recuperar contraseña - SolveIT',
       html: `
@@ -70,31 +57,14 @@ const requestPasswordReset = async (req, res) => {
         <hr>
         <p style="color: #999; font-size: 12px;">SolveIT - Sistema de Gestión de Incidencias IT</p>
       `,
-    };
-
-    console.log('Configuración Gmail:', {
-      hasUser: !!process.env.GMAIL_USER,
-      hasPass: !!process.env.GMAIL_PASSWORD,
-      user: process.env.GMAIL_USER,
-      passLength: process.env.GMAIL_PASSWORD?.length
     });
 
-    const transporter = getTransporter();
-    await new Promise((resolve, reject) => {
-      transporter.sendMail(mailOptions, (err, info) => {
-        if (err) {
-          console.error('Error al enviar email - Code:', err.code);
-          console.error('Error al enviar email - Message:', err.message);
-          console.error('Error al enviar email - Response:', err.response);
-          console.error('Error completo:', JSON.stringify(err, null, 2));
-          reject(err);
-        } else {
-          console.log('Email enviado exitosamente:', info.response);
-          resolve(info);
-        }
-      });
-    });
+    if (error) {
+      console.error('Error de Resend:', error);
+      return res.status(500).json({ message: 'Error al enviar email', error: error.message });
+    }
 
+    console.log('Email enviado exitosamente:', data.id);
     res.json({ message: 'Código enviado a tu email', token });
   } catch (err) {
     console.error('CATCH password reset error:', err.message);
