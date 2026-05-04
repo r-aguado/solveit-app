@@ -37,8 +37,8 @@ const askAI = async (req, res) => {
     }
 
     // Llamar a OpenAI
-    const response = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
       max_tokens: 1024,
       system: systemPrompt,
       messages: [
@@ -49,7 +49,7 @@ const askAI = async (req, res) => {
       ],
     });
 
-    const aiResponse = response.content[0].text;
+    const aiResponse = response.choices[0].message.content;
 
     // Guardar pregunta/respuesta
     await pool.query(
