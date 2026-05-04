@@ -111,6 +111,13 @@ async function init() {
       ALTER TABLE notifications ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id)
     `);
 
+    // Agregar columnas title, body, type a notifications si no existen
+    await client.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title VARCHAR(150)`);
+    await client.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS body TEXT`);
+    await client.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR(50)`);
+    // Hacer message opcional (las nuevas notifs usan title/body)
+    await client.query(`ALTER TABLE notifications ALTER COLUMN message DROP NOT NULL`).catch(() => {});
+
     // Base de conocimiento
     await client.query(`
       CREATE TABLE IF NOT EXISTS knowledge_base (

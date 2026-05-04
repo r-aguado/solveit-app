@@ -146,7 +146,8 @@ const create = async (req, res) => {
         'Nueva incidencia asignada',
         `Se te ha asignado: "${title}"`,
         'incident_assigned',
-        incident.id
+        incident.id,
+        req.companyId
       );
     }
 
@@ -191,7 +192,8 @@ const updateStatus = async (req, res) => {
         'Estado de incidencia actualizado',
         `"${inc.title}" → ${STATUS_LABEL[status]}`,
         'status_changed',
-        inc.id
+        inc.id,
+        req.companyId
       );
     }
     // Notificar al técnico asignado si no es quien hace el cambio
@@ -201,7 +203,8 @@ const updateStatus = async (req, res) => {
         'Estado de incidencia actualizado',
         `"${inc.title}" → ${STATUS_LABEL[status]}`,
         'status_changed',
-        inc.id
+        inc.id,
+        req.companyId
       );
     }
 
@@ -229,7 +232,7 @@ const addComment = async (req, res) => {
       for (const uid of [created_by, assigned_to]) {
         if (uid && !notified.has(uid)) {
           notified.add(uid);
-          await createNotification(uid, 'Nuevo comentario', `Comentario en "${title}"`, 'comment', parseInt(req.params.id));
+          await createNotification(uid, 'Nuevo comentario', `Comentario en "${title}"`, 'comment', parseInt(req.params.id), req.companyId);
         }
       }
     }
