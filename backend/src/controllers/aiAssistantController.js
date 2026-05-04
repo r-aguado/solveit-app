@@ -4,47 +4,60 @@ const axios = require('axios');
 const askAI = async (req, res) => {
   const { question } = req.body;
   const companyId = req.companyId;
+  const apiKey = process.env.GEMINI_API_KEY;
 
   if (!question?.trim()) {
     return res.status(400).json({ message: 'Pregunta requerida' });
   }
 
-  try {
-    const apiKey = process.env.CLAUDE_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ message: 'API key no configurada' });
-    }
+  if (!apiKey) {
+    return res.status(500).json({ message: 'GEMINI_API_KEY no configurada' });
+  }
 
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      {
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: question
-        }]
-      },
-      {
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        timeout: 30000
-      }
+  try {
+    // Buscar artículos relevantes de la Knowledge Base
+    const kbArticles = await pool.query(
+      `SELECT title, content FROM knowledge_base
+       WHERE company_id = $1 AND (title ILIKE $2 OR content ILIKE $2)
+       LIMIT 5`,
+      [companyId, `%${question}%`]
     );
 
-    const text = response.data.content[0].text;
+    let prompt = 'Eres un asistente de soporte IT profesional y amable. Responde de forma clara y concisa en español. ';
+
+    if (kbArticles.rows.length > 0) {
+      prompt += 'Usa la siguiente información de la base de conocimiento:\n\n';
+      kbArticles.rows.forEach((article, index) => {
+        prompt += `${index + 1}. ${article.title}: ${article.content}\n\n`;
+      });
+    }
+
+    prompt += `\nPregunta del usuario: ${question}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+    const response = await axios.post(url, {
+      contents: [{ parts: [{ text: prompt }] }]
+    }, { timeout: 30000 });
+
+    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+      console.error('Respuesta sin texto:', JSON.stringify(response.data));
+      return res.status(500).json({ message: 'Respuesta inválida de la IA' });
+    }
 
     await pool.query(
       'INSERT INTO ai_conversations (user_id, company_id, question, response, created_at) VALUES ($1, $2, $3, $4, NOW())',
       [req.user.id, companyId, question, text]
     ).catch(() => {});
 
-    res.json({ question, response: text });
+    res.json({ question, response: text, relevantArticles: kbArticles.rows.length });
   } catch (err) {
     console.error('AI Error:', err.response?.status, err.response?.data?.error?.message || err.message);
-    res.status(500).json({ message: err.response?.data?.error?.message || 'Error al procesar pregunta' });
+    res.status(500).json({
+      message: err.response?.data?.error?.message || 'Error al procesar pregunta'
+    });
   }
 };
 
