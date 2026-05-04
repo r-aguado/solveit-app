@@ -1,5 +1,5 @@
 const pool = require('../db');
-const OpenAI = require('openai');
+const { OpenAI } = require('openai');
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
