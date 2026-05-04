@@ -29,20 +29,12 @@ const requestPasswordReset = async (req, res) => {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
 
     // Guardar en BD
-    console.log('Guardando reset:', { userId, token: token.substring(0, 10), code, expiresAt });
-    try {
-      const insertResult = await pool.query(
-        'INSERT INTO password_resets (user_id, token, code, expires_at) VALUES ($1, $2, $3, $4)',
-        [userId, token, code, expiresAt]
-      );
-      console.log('Reset guardado exitosamente. Rows affected:', insertResult.rowCount);
-    } catch (insertErr) {
-      console.error('ERROR EN INSERT:', insertErr.message);
-      throw insertErr;
-    }
+    await pool.query(
+      'INSERT INTO password_resets (user_id, token, code, expires_at) VALUES ($1, $2, $3, $4)',
+      [userId, token, code, expiresAt]
+    );
 
     // Enviar email con Resend
-    console.log('Enviando email con Resend a:', email);
     const { data, error } = await resend.emails.send({
       from: 'SolveIT <onboarding@resend.dev>',
       to: email,
@@ -64,10 +56,9 @@ const requestPasswordReset = async (req, res) => {
       return res.status(500).json({ message: 'Error al enviar email', error: error.message });
     }
 
-    console.log('Email enviado exitosamente:', data.id);
     res.json({ message: 'Código enviado a tu email', token });
   } catch (err) {
-    console.error('CATCH password reset error:', err.message);
+    console.error('Password reset error:', err.message);
     res.status(500).json({ message: 'Error del servidor', error: err.message });
   }
 };
