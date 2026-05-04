@@ -18,7 +18,7 @@ const askAI = async (req, res) => {
   }
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
 
     console.log('Calling Gemini API...');
     const response = await axios.post(url, {
