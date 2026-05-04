@@ -1,8 +1,6 @@
 const pool = require('../db');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 const askAI = async (req, res) => {
   const { question } = req.body;
   const companyId = req.companyId;
@@ -11,7 +9,12 @@ const askAI = async (req, res) => {
     return res.status(400).json({ message: 'La pregunta es requerida' });
   }
 
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(500).json({ message: 'GEMINI_API_KEY no está configurada' });
+  }
+
   try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     // Buscar artículos relevantes de la Knowledge Base
     const kbArticles = await pool.query(
       `SELECT title, content FROM knowledge_base
