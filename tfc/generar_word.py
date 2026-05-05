@@ -1,53 +1,126 @@
 """
-Genera el TFC en formato Word (.docx) con el formato exigido:
-- Times New Roman 12 (cuerpo) / 10 (pie)
-- Interlineado 1.5
-- Márgenes: superior/inferior 2cm, izq/der 2.5cm
-- DIN A4
+Genera el TFC en formato Word (.docx) siguiendo la plantilla oficial
+"Modelo TFC TECNOLOGÍA 24-25" con:
+- Logo "La Otra FP | PRO2" en esquina superior derecha de cada página
+- Cuadraditos decorativos en esquina superior izquierda de cada página
+- Numeración de página en el pie
+- Times New Roman 12 / interlineado 1.5 / márgenes 2/2/2.5/2.5
+- Estructura: Portada, Resumen, Índice, secciones 1-9
 """
 
+import os
 from docx import Document
-from docx.shared import Pt, Cm, RGBColor
+from docx.shared import Pt, Cm, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-OUTPUT = r"C:\Users\r.aguado\TFC_Rubén_Aguado\tfc\TFC_SolveIT.docx"
+BASE = r"C:\Users\r.aguado\TFC_Rubén_Aguado\tfc"
+ASSETS = os.path.join(BASE, "assets")
+OUTPUT_DOCX = os.path.join(BASE, "TFC_SolveIT.docx")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Configuración del documento
+# Documento + márgenes
 # ─────────────────────────────────────────────────────────────────────────────
 doc = Document()
-
-# Márgenes
 section = doc.sections[0]
 section.top_margin = Cm(2)
 section.bottom_margin = Cm(2)
 section.left_margin = Cm(2.5)
 section.right_margin = Cm(2.5)
+section.header_distance = Cm(0.8)
+section.footer_distance = Cm(0.8)
 
-# Estilo Normal
+# Estilo Normal por defecto
 style = doc.styles["Normal"]
 style.font.name = "Times New Roman"
 style.font.size = Pt(12)
 style.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 style.paragraph_format.space_after = Pt(6)
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HEADER en todas las páginas: cuadraditos a la izquierda + logo a la derecha
+# ─────────────────────────────────────────────────────────────────────────────
+def setup_header():
+    header = section.header
+    # Una tabla 1x2 en el header para alinear izq/der
+    table = header.add_table(rows=1, cols=2, width=Cm(16))
+    table.autofit = False
+    table.allow_autofit = False
+
+    cell_left = table.cell(0, 0)
+    cell_right = table.cell(0, 1)
+
+    # Anchos de columna
+    cell_left.width = Cm(8)
+    cell_right.width = Cm(8)
+
+    # Imagen izquierda (cuadraditos)
+    p_left = cell_left.paragraphs[0]
+    p_left.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run_left = p_left.add_run()
+    run_left.add_picture(os.path.join(ASSETS, "logo_corner.png"), width=Cm(2))
+
+    # Imagen derecha (logo)
+    p_right = cell_right.paragraphs[0]
+    p_right.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    run_right = p_right.add_run()
+    run_right.add_picture(os.path.join(ASSETS, "logo_header.png"), width=Cm(3.5))
+
+    # Sin bordes en la tabla del header
+    tbl = table._tbl
+    tblPr = tbl.tblPr
+    tblBorders = OxmlElement("w:tblBorders")
+    for border in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        b = OxmlElement(f"w:{border}")
+        b.set(qn("w:val"), "nil")
+        tblBorders.append(b)
+    tblPr.append(tblBorders)
+
+
+def setup_footer_page_number():
+    """Número de página en el pie centrado."""
+    footer = section.footer
+    p = footer.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    run = p.add_run()
+    run.font.name = "Times New Roman"
+    run.font.size = Pt(10)
+
+    # Campo PAGE
+    fld_begin = OxmlElement("w:fldChar")
+    fld_begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.text = "PAGE"
+    fld_end = OxmlElement("w:fldChar")
+    fld_end.set(qn("w:fldCharType"), "end")
+    run._r.append(fld_begin)
+    run._r.append(instr)
+    run._r.append(fld_end)
+
+
+setup_header()
+setup_footer_page_number()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
-def add_h1(text):
+def add_h1(text, page_break_before=True):
+    if page_break_before:
+        doc.add_page_break()
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    p.paragraph_format.space_before = Pt(18)
+    p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(12)
     run = p.add_run(text)
     run.font.name = "Times New Roman"
-    run.font.size = Pt(14)
+    run.font.size = Pt(16)
     run.bold = True
-    run.font.color.rgb = RGBColor(0x1F, 0x3A, 0x93)
     return p
+
 
 def add_h2(text):
     p = doc.add_paragraph()
@@ -59,6 +132,7 @@ def add_h2(text):
     run.bold = True
     return p
 
+
 def add_h3(text):
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(8)
@@ -69,6 +143,7 @@ def add_h3(text):
     run.bold = True
     run.italic = True
     return p
+
 
 def add_para(text, justify=True, bold=False, italic=False, center=False):
     p = doc.add_paragraph()
@@ -83,6 +158,7 @@ def add_para(text, justify=True, bold=False, italic=False, center=False):
     run.italic = italic
     return p
 
+
 def add_bullet(text):
     p = doc.add_paragraph(style="List Bullet")
     p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
@@ -91,7 +167,8 @@ def add_bullet(text):
     run.font.size = Pt(12)
     return p
 
-def add_table(headers, rows, col_widths=None):
+
+def add_table(headers, rows):
     table = doc.add_table(rows=1, cols=len(headers))
     table.style = "Light Grid Accent 1"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -114,15 +191,22 @@ def add_table(headers, rows, col_widths=None):
     doc.add_paragraph()
     return table
 
-def add_page_break():
-    doc.add_page_break()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PORTADA
+# PORTADA (siguiendo el modelo oficial)
 # ─────────────────────────────────────────────────────────────────────────────
 for _ in range(3):
     doc.add_paragraph()
 
+# Logo grande centrado
+p = doc.add_paragraph()
+p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = p.add_run()
+run.add_picture(os.path.join(ASSETS, "logo_portada.png"), width=Cm(8))
+
+doc.add_paragraph()
+
+# TRABAJO FIN DE CICLO
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 run = p.add_run("TRABAJO FIN DE CICLO")
@@ -137,19 +221,25 @@ run.font.name = "Times New Roman"
 run.font.size = Pt(14)
 run.bold = True
 
-for _ in range(3):
-    doc.add_paragraph()
+doc.add_paragraph()
+doc.add_paragraph()
 
+# Título del trabajo
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = p.add_run("SolveIT: Plataforma SaaS multi-tenant para la gestión inteligente de incidencias IT en pequeñas y medianas empresas")
+run = p.add_run(
+    "SolveIT: Plataforma SaaS multi-tenant para la gestión inteligente "
+    "de incidencias IT en pequeñas y medianas empresas"
+)
 run.font.name = "Times New Roman"
-run.font.size = Pt(16)
+run.font.size = Pt(15)
 run.bold = True
 
-for _ in range(4):
-    doc.add_paragraph()
+doc.add_paragraph()
+doc.add_paragraph()
+doc.add_paragraph()
 
+# Alumno/a
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 run = p.add_run("Alumno/a:")
@@ -166,6 +256,7 @@ run.bold = True
 
 doc.add_paragraph()
 
+# Tutor/a
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 run = p.add_run("Tutor/a:")
@@ -180,23 +271,32 @@ run.font.name = "Times New Roman"
 run.font.size = Pt(13)
 run.bold = True
 
-for _ in range(4):
-    doc.add_paragraph()
+doc.add_paragraph()
+doc.add_paragraph()
+doc.add_paragraph()
 
+# Ciclo formativo
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = p.add_run("CICLO FORMATIVO DE GRADO SUPERIOR EN DESARROLLO DE APLICACIONES MULTIPLATAFORMA (DAM)")
+run = p.add_run(
+    "CICLO FORMATIVO DE GRADO SUPERIOR EN DESARROLLO DE APLICACIONES MULTIPLATAFORMA (DAM)"
+)
 run.font.name = "Times New Roman"
 run.font.size = Pt(13)
 run.bold = True
 
-add_page_break()
+# ─────────────────────────────────────────────────────────────────────────────
+# PÁGINA EN BLANCO (como en el modelo)
+# ─────────────────────────────────────────────────────────────────────────────
+doc.add_page_break()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RESUMEN
 # ─────────────────────────────────────────────────────────────────────────────
+doc.add_page_break()
+
 p = doc.add_paragraph()
-p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+p.alignment = WD_ALIGN_PARAGRAPH.LEFT
 run = p.add_run("Resumen")
 run.font.name = "Times New Roman"
 run.font.size = Pt(14)
@@ -233,7 +333,7 @@ run.font.size = Pt(12)
 doc.add_paragraph()
 
 p = doc.add_paragraph()
-p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+p.alignment = WD_ALIGN_PARAGRAPH.LEFT
 run = p.add_run("Abstract")
 run.font.name = "Times New Roman"
 run.font.size = Pt(14)
@@ -242,20 +342,20 @@ run.italic = True
 
 add_para(
     "This Final Project develops SolveIT, a multi-tenant SaaS platform aimed at small and "
-    "medium-sized enterprises that need to manage IT incidents professionally without assuming "
-    "the cost of enterprise solutions such as ServiceNow or Jira Service Management. The "
-    "solution integrates a cross-platform mobile application developed in React Native, a "
-    "responsive web application built in Next.js and a Node.js backend with a PostgreSQL "
+    "medium-sized enterprises that need to manage IT incidents professionally without "
+    "assuming the cost of enterprise solutions such as ServiceNow or Jira Service Management. "
+    "The solution integrates a cross-platform mobile application developed in React Native, "
+    "a responsive web application built in Next.js and a Node.js backend with a PostgreSQL "
     "database. Its features include automatic technician assignment based on workload, a "
     "collaborative knowledge base, an internal forum for teams, secure password recovery "
     "through email codes and, as a key differentiator, an integrated artificial intelligence "
-    "assistant powered by Google's Gemma model that guides users through technical issues and "
-    "reduces the workload of the support department. The multi-tenant architecture enables a "
-    "single deployment to serve multiple companies with full data isolation. The platform is "
-    "hosted on Railway cloud infrastructure with on-demand scaling and a reduced operating "
-    "cost. After developing and deploying the platform, its functionality has been validated "
-    "on two pilot companies, demonstrating that the solution is viable as a commercial product "
-    "accessible to the Spanish business sector."
+    "assistant powered by Google's Gemma model that guides users through technical issues "
+    "and reduces the workload of the support department. The multi-tenant architecture "
+    "enables a single deployment to serve multiple companies with full data isolation. The "
+    "platform is hosted on Railway cloud infrastructure with on-demand scaling and a reduced "
+    "operating cost. After developing and deploying the platform, its functionality has "
+    "been validated on two pilot companies, demonstrating that the solution is viable as a "
+    "commercial product accessible to the Spanish business sector."
 )
 
 p = doc.add_paragraph()
@@ -268,49 +368,60 @@ run = p.add_run("AI assistant; incident management; multi-tenant; SaaS; SME")
 run.font.name = "Times New Roman"
 run.font.size = Pt(12)
 
-add_page_break()
+# ─────────────────────────────────────────────────────────────────────────────
+# ÍNDICE
+# ─────────────────────────────────────────────────────────────────────────────
+doc.add_page_break()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ÍNDICE (manual, después se puede regenerar en Word)
-# ─────────────────────────────────────────────────────────────────────────────
 p = doc.add_paragraph()
 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 run = p.add_run("ÍNDICE")
 run.font.name = "Times New Roman"
-run.font.size = Pt(16)
+run.font.size = Pt(20)
 run.bold = True
 
 doc.add_paragraph()
 
-indice = [
-    "1. INTRODUCCIÓN",
-    "2. ANÁLISIS",
-    "    2.1 Estudio de mercado",
-    "    2.2 Elección de soluciones",
-    "3. VALORACIÓN ECONÓMICA",
-    "    3.1 Hardware",
-    "    3.2 Licencias y servicios",
-    "    3.3 Personal",
-    "    3.4 Costes de mantenimiento",
-    "4. VIABILIDAD DEL PROYECTO",
-    "5. PUESTA EN MARCHA",
-    "    5.1 Forma jurídica y trámites",
-    "    5.2 Recursos humanos",
-    "    5.3 Prevención de riesgos laborales",
-    "    5.4 Análisis medioambiental",
-    "    5.5 Plan de financiación",
-    "6. EVALUACIÓN FUNCIONAL",
-    "7. CONCLUSIÓN",
-    "8. BIBLIOGRAFÍA",
-    "9. ANEXOS",
+# Tabla de contenido manual con estilo
+indice_items = [
+    ("1.", "INTRODUCCIÓN", "5"),
+    ("2.", "ANÁLISIS", "6"),
+    ("", "    2.1 Estudio de mercado", "6"),
+    ("", "    2.2 Elección de soluciones", "8"),
+    ("3.", "VALORACIÓN ECONÓMICA", "10"),
+    ("", "    3.1 Hardware", "10"),
+    ("", "    3.2 Licencias y servicios", "11"),
+    ("", "    3.3 Personal", "11"),
+    ("", "    3.4 Costes de mantenimiento", "12"),
+    ("4.", "VIABILIDAD DEL PROYECTO", "13"),
+    ("5.", "PUESTA EN MARCHA", "16"),
+    ("", "    5.1 Forma jurídica y trámites", "16"),
+    ("", "    5.2 Recursos humanos", "17"),
+    ("", "    5.3 Prevención de riesgos laborales", "18"),
+    ("", "    5.4 Análisis medioambiental", "19"),
+    ("", "    5.5 Plan de financiación", "19"),
+    ("6.", "EVALUACIÓN FUNCIONAL", "21"),
+    ("7.", "CONCLUSIÓN", "24"),
+    ("8.", "BIBLIOGRAFÍA", "25"),
+    ("9.", "ANEXOS", "27"),
 ]
-for line in indice:
+
+for num, titulo, pag in indice_items:
     p = doc.add_paragraph()
-    run = p.add_run(line)
+    p.paragraph_format.tab_stops.add_tab_stop(Cm(15.5), WD_ALIGN_PARAGRAPH.RIGHT, leader=2)
+    is_main = num != ""
+    txt = f"{num} {titulo}" if is_main else titulo
+    run = p.add_run(txt)
     run.font.name = "Times New Roman"
     run.font.size = Pt(12)
-
-add_page_break()
+    if is_main:
+        run.bold = True
+    p.add_run("\t").font.size = Pt(12)
+    run_pag = p.add_run(pag)
+    run_pag.font.name = "Times New Roman"
+    run_pag.font.size = Pt(12)
+    if is_main:
+        run_pag.bold = True
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. INTRODUCCIÓN
@@ -332,67 +443,70 @@ add_para(
 add_para(
     "Mientras que las grandes corporaciones cuentan con soluciones consolidadas como "
     "ServiceNow, BMC Helix o Jira Service Management para gestionar sus tickets de soporte, "
-    "las pequeñas y medianas empresas (PYME), que representan el 99,8% del tejido empresarial "
-    "español según el Ministerio de Industria (2024), se encuentran ante un dilema. Por un "
-    "lado, el coste y la complejidad de implantación de las soluciones empresariales resultan "
-    "inasumibles. Por otro, gestionar las incidencias mediante hojas de cálculo, correos "
-    "electrónicos o sistemas caseros conlleva pérdidas de información, falta de trazabilidad "
-    "y una experiencia de usuario deficiente."
+    "las pequeñas y medianas empresas (PYME), que representan el 99,8% del tejido "
+    "empresarial español según el Ministerio de Industria (2024), se encuentran ante un "
+    "dilema. Por un lado, el coste y la complejidad de implantación de las soluciones "
+    "empresariales resultan inasumibles. Por otro, gestionar las incidencias mediante "
+    "hojas de cálculo, correos electrónicos o sistemas caseros conlleva pérdidas de "
+    "información, falta de trazabilidad y una experiencia de usuario deficiente."
 )
 
 add_para(
-    "Este Trabajo Fin de Ciclo presenta SolveIT, una plataforma SaaS (Software as a Service) "
-    "multi-tenant concebida específicamente para cubrir esta necesidad. La idea de negocio "
-    "consiste en ofrecer a las PYME un sistema profesional de gestión de incidencias IT con "
-    "todas las funcionalidades que un departamento de soporte moderno requiere, accesible "
-    "desde el navegador y desde el móvil, con un modelo de pago por suscripción mensual y "
-    "sin necesidad de mantenimiento por parte del cliente."
+    "Este Trabajo Fin de Ciclo presenta SolveIT, una plataforma SaaS (Software as a "
+    "Service) multi-tenant concebida específicamente para cubrir esta necesidad. La idea "
+    "de negocio consiste en ofrecer a las PYME un sistema profesional de gestión de "
+    "incidencias IT con todas las funcionalidades que un departamento de soporte moderno "
+    "requiere, accesible desde el navegador y desde el móvil, con un modelo de pago por "
+    "suscripción mensual y sin necesidad de mantenimiento por parte del cliente."
 )
 
 add_para(
-    "La plataforma propone un servicio en tres capas. La primera capa es la aplicación móvil "
-    "multiplataforma, desarrollada con React Native y Expo, que permite a usuarios y técnicos "
-    "gestionar incidencias desde cualquier ubicación. La segunda capa es la aplicación web "
-    "responsive, construida con Next.js, orientada principalmente a roles administrativos y "
-    "a entornos donde el ordenador es la herramienta habitual. La tercera capa es el backend "
-    "Node.js con base de datos PostgreSQL, donde reside la lógica de negocio y se centralizan "
-    "los datos de todas las empresas cliente bajo una arquitectura multi-tenant que garantiza "
-    "el aislamiento total entre organizaciones."
+    "La plataforma propone un servicio en tres capas. La primera capa es la aplicación "
+    "móvil multiplataforma, desarrollada con React Native y Expo, que permite a usuarios "
+    "y técnicos gestionar incidencias desde cualquier ubicación. La segunda capa es la "
+    "aplicación web responsive, construida con Next.js, orientada principalmente a roles "
+    "administrativos y a entornos donde el ordenador es la herramienta habitual. La "
+    "tercera capa es el backend Node.js con base de datos PostgreSQL, donde reside la "
+    "lógica de negocio y se centralizan los datos de todas las empresas cliente bajo una "
+    "arquitectura multi-tenant que garantiza el aislamiento total entre organizaciones."
 )
 
 add_para(
-    "Como elemento diferenciador frente a la competencia, SolveIT incorpora un asistente de "
-    "inteligencia artificial basado en el modelo Gemma de Google que asiste a los usuarios "
-    "ante problemas técnicos antes de generar un ticket. Este asistente, además de mejorar "
-    "la experiencia del empleado al ofrecerle una respuesta inmediata, reduce la carga sobre "
-    "el departamento de soporte al filtrar consultas que pueden resolverse con la documentación existente."
+    "Como elemento diferenciador frente a la competencia, SolveIT incorpora un asistente "
+    "de inteligencia artificial basado en el modelo Gemma de Google que asiste a los "
+    "usuarios ante problemas técnicos antes de generar un ticket. Este asistente, además "
+    "de mejorar la experiencia del empleado al ofrecerle una respuesta inmediata, reduce "
+    "la carga sobre el departamento de soporte al filtrar consultas que pueden resolverse "
+    "con la documentación existente."
 )
 
 add_para(
-    "La justificación personal de este proyecto responde a varias motivaciones interconectadas. "
-    "Durante la realización de las prácticas en empresa observé de primera mano cómo los "
-    "departamentos de IT de las PYME conviven con herramientas heterogéneas y poco integradas "
-    "para gestionar el día a día. La idea de construir una solución que aglutine todas las "
-    "necesidades en un único producto, accesible y con tecnologías modernas, surgió de manera "
-    "natural. A nivel profesional, este trabajo me permite consolidar las competencias "
-    "adquiridas en los módulos de Programación Multimedia y Dispositivos Móviles, Acceso a "
-    "Datos, Programación de Servicios y Procesos y Sistemas de Gestión Empresarial, "
-    "integrándolas en un único proyecto end-to-end. Además, posiciona mi perfil profesional "
-    "en un sector con alta demanda como es el desarrollo full-stack y la integración de "
-    "inteligencia artificial en productos reales."
+    "La justificación personal de este proyecto responde a varias motivaciones "
+    "interconectadas. Durante la realización de las prácticas en empresa observé de "
+    "primera mano cómo los departamentos de IT de las PYME conviven con herramientas "
+    "heterogéneas y poco integradas para gestionar el día a día. La idea de construir "
+    "una solución que aglutine todas las necesidades en un único producto, accesible y "
+    "con tecnologías modernas, surgió de manera natural. A nivel profesional, este "
+    "trabajo me permite consolidar las competencias adquiridas en los módulos de "
+    "Programación Multimedia y Dispositivos Móviles, Acceso a Datos, Programación de "
+    "Servicios y Procesos y Sistemas de Gestión Empresarial, integrándolas en un único "
+    "proyecto end-to-end. Además, posiciona mi perfil profesional en un sector con alta "
+    "demanda como es el desarrollo full-stack y la integración de inteligencia artificial "
+    "en productos reales."
 )
 
 add_para(
-    "Desde la perspectiva del emprendimiento, SolveIT se presenta como un proyecto alineado "
-    "con los Objetivos de Desarrollo Sostenible de la Agenda 2030 (Naciones Unidas, 2015). "
-    "En particular, contribuye al ODS 8 (Trabajo decente y crecimiento económico) al mejorar "
-    "la productividad de los trabajadores reduciendo el tiempo de inactividad por incidencias "
-    "técnicas; al ODS 9 (Industria, innovación e infraestructura) al democratizar el acceso "
-    "a herramientas de gestión IT que hasta ahora estaban reservadas a grandes empresas; y al "
-    "ODS 12 (Producción y consumo responsables) al fomentar la digitalización y reducir el "
-    "uso de papel y desplazamientos físicos del personal técnico. El proyecto se enmarca, "
-    "asimismo, dentro de las economías transformadoras al impulsar la digitalización del "
-    "tejido productivo y al ofrecer un modelo de software accesible que reduce la brecha "
+    "Desde la perspectiva del emprendimiento, SolveIT se presenta como un proyecto "
+    "alineado con los Objetivos de Desarrollo Sostenible de la Agenda 2030 (Naciones "
+    "Unidas, 2015). En particular, contribuye al ODS 8 (Trabajo decente y crecimiento "
+    "económico) al mejorar la productividad de los trabajadores reduciendo el tiempo de "
+    "inactividad por incidencias técnicas; al ODS 9 (Industria, innovación e "
+    "infraestructura) al democratizar el acceso a herramientas de gestión IT que hasta "
+    "ahora estaban reservadas a grandes empresas; y al ODS 12 (Producción y consumo "
+    "responsables) al fomentar la digitalización y reducir el uso de papel y "
+    "desplazamientos físicos del personal técnico. El proyecto se enmarca, asimismo, "
+    "dentro de las economías transformadoras al impulsar la digitalización del tejido "
+    "productivo y al ofrecer un modelo de software accesible que reduce la brecha "
     "tecnológica entre grandes corporaciones y PYME."
 )
 
@@ -409,15 +523,15 @@ add_para(
     "software ITSM superó los 12.000 millones de dólares en 2023 y se proyecta una tasa "
     "anual compuesta de crecimiento (CAGR) cercana al 9% hasta 2028. Este crecimiento "
     "responde a la combinación de tres factores: la digitalización acelerada tras la "
-    "pandemia, la adopción de modelos híbridos de trabajo y la creciente complejidad de las "
-    "infraestructuras IT."
+    "pandemia, la adopción de modelos híbridos de trabajo y la creciente complejidad de "
+    "las infraestructuras IT."
 )
 
 add_para(
     "Para validar la necesidad del producto se ha realizado una investigación cualitativa "
-    "basada en observación directa durante el periodo de Formación en Centros de Trabajo y "
-    "en conversaciones informales con responsables de soporte de cinco empresas de entre 15 "
-    "y 200 empleados. Las conclusiones más relevantes son las siguientes:"
+    "basada en observación directa durante el periodo de Formación en Centros de Trabajo "
+    "y en conversaciones informales con responsables de soporte de cinco empresas de "
+    "entre 15 y 200 empleados. Las conclusiones más relevantes son las siguientes:"
 )
 add_bullet("Cuatro de las cinco empresas consultadas no disponen de un sistema profesional de tickets. Gestionan las incidencias mediante correo electrónico o aplicaciones de mensajería instantánea.")
 add_bullet("El 100% de los responsables consultados reconoce que pierde información sobre incidencias previas, lo que provoca que se repitan diagnósticos para problemas ya resueltos.")
@@ -429,24 +543,24 @@ add_h3("Análisis de la competencia")
 add_para(
     "ServiceNow es la solución líder en el segmento corporativo. Ofrece una plataforma "
     "completa de gestión de servicios IT, gestión de activos, automatización y analítica. "
-    "Su precio parte de aproximadamente 100 dólares por usuario y mes, con costes adicionales "
-    "de implantación que pueden superar los 50.000 euros para una empresa mediana. Su "
-    "orientación es claramente enterprise y resulta inviable para PYME."
+    "Su precio parte de aproximadamente 100 dólares por usuario y mes, con costes "
+    "adicionales de implantación que pueden superar los 50.000 euros para una empresa "
+    "mediana. Su orientación es claramente enterprise y resulta inviable para PYME."
 )
 
 add_para(
-    "Jira Service Management (Atlassian) es la opción más popular entre empresas tecnológicas "
-    "medianas. Su modelo es freemium con un plan gratuito limitado a tres agentes y planes "
-    "de pago desde 21 dólares por agente al mes. Aunque su precio es más accesible que "
-    "ServiceNow, su curva de aprendizaje es considerable y muchas funcionalidades requieren "
-    "plugins de pago."
+    "Jira Service Management (Atlassian) es la opción más popular entre empresas "
+    "tecnológicas medianas. Su modelo es freemium con un plan gratuito limitado a tres "
+    "agentes y planes de pago desde 21 dólares por agente al mes. Aunque su precio es "
+    "más accesible que ServiceNow, su curva de aprendizaje es considerable y muchas "
+    "funcionalidades requieren plugins de pago."
 )
 
 add_para(
-    "Freshservice (Freshworks) es una solución cloud orientada a empresas medianas. Precios "
-    "desde 19 dólares por agente al mes, interfaz amigable y buena experiencia móvil. Su "
-    "limitación principal es que está orientada a empresas con un único tenant y no "
-    "incorpora capacidades nativas de IA generativa."
+    "Freshservice (Freshworks) es una solución cloud orientada a empresas medianas. "
+    "Precios desde 19 dólares por agente al mes, interfaz amigable y buena experiencia "
+    "móvil. Su limitación principal es que está orientada a empresas con un único tenant "
+    "y no incorpora capacidades nativas de IA generativa."
 )
 
 add_para(
@@ -481,10 +595,10 @@ add_h2("2.2 Elección de soluciones")
 
 add_para(
     "Tras el análisis de mercado y aplicando la filosofía KISS (Keep It Simple, Stupid), "
-    "se ha decidido construir SolveIT como una solución a medida sobre un stack tecnológico "
-    "moderno y mayoritariamente abierto, en lugar de adaptar una solución existente o "
-    "construir un fork de un sistema open source como Zammad. Las razones de esta elección "
-    "son las siguientes."
+    "se ha decidido construir SolveIT como una solución a medida sobre un stack "
+    "tecnológico moderno y mayoritariamente abierto, en lugar de adaptar una solución "
+    "existente o construir un fork de un sistema open source como Zammad. Las razones de "
+    "esta elección son las siguientes."
 )
 
 add_para(
@@ -497,20 +611,21 @@ add_para(
 
 add_para(
     "Complejidad de instalación. El cliente final no tiene que instalar nada en sus "
-    "sistemas. La aplicación móvil se distribuye a través de las tiendas oficiales (Google "
-    "Play y App Store) y la aplicación web se accede desde un navegador. El backend se "
-    "aloja en infraestructura cloud gestionada por el proveedor del servicio."
+    "sistemas. La aplicación móvil se distribuye a través de las tiendas oficiales "
+    "(Google Play y App Store) y la aplicación web se accede desde un navegador. El "
+    "backend se aloja en infraestructura cloud gestionada por el proveedor del servicio."
 )
 
 add_para(
-    "Velocidad de desarrollo. React Native y Next.js comparten lenguaje (JavaScript/"
+    "Velocidad de desarrollo. React Native y Next.js comparten lenguaje (JavaScript / "
     "TypeScript), lo que permite reutilizar lógica entre web y móvil. Expo simplifica el "
     "ciclo de desarrollo y publicación de la aplicación móvil."
 )
 
 add_para(
     "Coste. Todas las tecnologías base son gratuitas y de código abierto. Los servicios "
-    "cloud se contratan por uso, lo que permite escalar el coste linealmente con los ingresos."
+    "cloud se contratan por uso, lo que permite escalar el coste linealmente con los "
+    "ingresos."
 )
 
 add_h3("Stack tecnológico definitivo")
@@ -567,8 +682,8 @@ add_h2("3.2 Licencias y servicios")
 
 add_para(
     "Una de las ventajas de elegir un stack basado en software libre es la práctica "
-    "inexistencia de costes de licencia. Los costes recurrentes corresponden principalmente "
-    "a servicios cloud y SaaS de terceros."
+    "inexistencia de costes de licencia. Los costes recurrentes corresponden "
+    "principalmente a servicios cloud y SaaS de terceros."
 )
 
 add_table(
@@ -594,9 +709,9 @@ add_para(
 add_h2("3.3 Personal")
 
 add_para(
-    "Durante la fase inicial el desarrollo lo asume el promotor del proyecto. El coste del "
-    "personal se valora a precio de mercado para poder construir un análisis de viabilidad "
-    "realista, aunque en la práctica se trate de horas autoaplicadas."
+    "Durante la fase inicial el desarrollo lo asume el promotor del proyecto. El coste "
+    "del personal se valora a precio de mercado para poder construir un análisis de "
+    "viabilidad realista, aunque en la práctica se trate de horas autoaplicadas."
 )
 
 add_table(
@@ -613,11 +728,12 @@ add_table(
 add_h2("3.4 Costes de mantenimiento")
 
 add_para(
-    "Una vez la plataforma está en producción, el mantenimiento incluye actualizaciones de "
-    "dependencias, corrección de bugs, atención a incidencias de clientes y desarrollo "
-    "evolutivo. Para el primer año se estima una dedicación media de 8 horas semanales "
-    "(aproximadamente 384 horas anuales), lo que supone un coste de 9.600 €. A esto se suma "
-    "el coste creciente de la infraestructura cloud (estimado en 600 € adicionales)."
+    "Una vez la plataforma está en producción, el mantenimiento incluye actualizaciones "
+    "de dependencias, corrección de bugs, atención a incidencias de clientes y "
+    "desarrollo evolutivo. Para el primer año se estima una dedicación media de 8 horas "
+    "semanales (aproximadamente 384 horas anuales), lo que supone un coste de 9.600 €. "
+    "A esto se suma el coste creciente de la infraestructura cloud (estimado en 600 € "
+    "adicionales)."
 )
 
 add_h3("Resumen económico año 1")
@@ -639,8 +755,8 @@ add_table(
 add_h1("4. VIABILIDAD DEL PROYECTO")
 
 add_para(
-    "El análisis de viabilidad se aborda desde tres dimensiones complementarias: viabilidad "
-    "técnica, viabilidad económica y viabilidad de mercado."
+    "El análisis de viabilidad se aborda desde tres dimensiones complementarias: "
+    "viabilidad técnica, viabilidad económica y viabilidad de mercado."
 )
 
 add_h3("Viabilidad técnica")
@@ -650,16 +766,16 @@ add_para(
     "desplegado en producción. La aplicación está accesible públicamente en "
     "solveit-app-production.up.railway.app y la versión móvil es instalable mediante un "
     "APK generado con EAS Build de Expo. El stack elegido es maduro y existe abundante "
-    "documentación oficial y comunitaria. La arquitectura multi-tenant basada en company_id "
-    "por fila ha sido validada con dos empresas en paralelo (SolveIT Demo y LKS Next) sin "
-    "fugas de información entre tenants."
+    "documentación oficial y comunitaria. La arquitectura multi-tenant basada en "
+    "company_id por fila ha sido validada con dos empresas en paralelo (SolveIT Demo y "
+    "LKS Next) sin fugas de información entre tenants."
 )
 
 add_h3("Viabilidad económica")
 
 add_para(
-    "Para evaluar la viabilidad económica se ha construido un modelo de proyección a tres "
-    "años con tres planes comerciales:"
+    "Para evaluar la viabilidad económica se ha construido un modelo de proyección a "
+    "tres años con tres planes comerciales:"
 )
 
 add_table(
@@ -683,20 +799,20 @@ add_table(
 )
 
 add_para(
-    "El punto de equilibrio se alcanza durante el tercer año, lo que es coherente con los "
-    "plazos habituales en proyectos SaaS B2B (Frasco, 2023). Los dos primeros años requieren "
-    "financiación externa o reinversión de horas no remuneradas del promotor."
+    "El punto de equilibrio se alcanza durante el tercer año, lo que es coherente con "
+    "los plazos habituales en proyectos SaaS B2B (Frasco, 2023). Los dos primeros años "
+    "requieren financiación externa o reinversión de horas no remuneradas del promotor."
 )
 
 add_h3("Viabilidad de mercado")
 
 add_para(
-    "España cuenta con aproximadamente 2,9 millones de PYME activas (Ministerio de Industria, "
-    "2024). Asumiendo conservadoramente que solo el 5% de las PYME con más de 10 empleados "
-    "podrían ser clientes potenciales (alrededor de 30.000 empresas), capturar un 0,2% de "
-    "ese segmento durante los primeros tres años (60 clientes) es un objetivo razonable. Los "
-    "clientes objetivo son PYME españolas del sector servicios, comercio y manufactura ligera "
-    "con plantillas entre 10 y 100 empleados."
+    "España cuenta con aproximadamente 2,9 millones de PYME activas (Ministerio de "
+    "Industria, 2024). Asumiendo conservadoramente que solo el 5% de las PYME con más "
+    "de 10 empleados podrían ser clientes potenciales (alrededor de 30.000 empresas), "
+    "capturar un 0,2% de ese segmento durante los primeros tres años (60 clientes) es "
+    "un objetivo razonable. Los clientes objetivo son PYME españolas del sector "
+    "servicios, comercio y manufactura ligera con plantillas entre 10 y 100 empleados."
 )
 
 add_h3("Riesgos identificados")
@@ -704,8 +820,8 @@ add_h3("Riesgos identificados")
 add_table(
     ["Riesgo", "Probabilidad", "Impacto", "Mitigación"],
     [
-        ["Fuga de información entre tenants", "Baja", "Alto", "Tests automáticos, auditoría externa"],
-        ["Caída prolongada del proveedor cloud", "Media", "Alto", "Backups diarios, plan de migración"],
+        ["Fuga de información entre tenants", "Baja", "Alto", "Tests automáticos, auditoría"],
+        ["Caída prolongada del proveedor cloud", "Media", "Alto", "Backups diarios, plan migración"],
         ["Cambio en política de precios de IA", "Media", "Medio", "Capa de abstracción multi-proveedor"],
         ["Brecha de seguridad / RGPD", "Baja", "Muy alto", "Cifrado, auditorías, seguro"],
         ["Aparición de competidor con más recursos", "Alta", "Medio", "Foco PYME, precio, IA, soporte"],
@@ -721,12 +837,12 @@ add_h1("5. PUESTA EN MARCHA")
 add_h2("5.1 Forma jurídica y trámites de constitución")
 
 add_para(
-    "La forma jurídica seleccionada para la explotación comercial de SolveIT es la Sociedad "
-    "Limitada Unipersonal (SLU). Esta elección se justifica por tres motivos. Primero, "
-    "limita la responsabilidad del emprendedor al capital aportado, protegiendo el "
-    "patrimonio personal frente a posibles reclamaciones. Segundo, transmite mayor confianza "
-    "a clientes B2B que otras formas como autónomo. Tercero, facilita la entrada de socios "
-    "o inversores en el futuro mediante ampliación de capital."
+    "La forma jurídica seleccionada para la explotación comercial de SolveIT es la "
+    "Sociedad Limitada Unipersonal (SLU). Esta elección se justifica por tres motivos. "
+    "Primero, limita la responsabilidad del emprendedor al capital aportado, protegiendo "
+    "el patrimonio personal frente a posibles reclamaciones. Segundo, transmite mayor "
+    "confianza a clientes B2B que otras formas como autónomo. Tercero, facilita la "
+    "entrada de socios o inversores en el futuro mediante ampliación de capital."
 )
 
 add_para("Los trámites para la constitución son los siguientes:")
@@ -743,10 +859,11 @@ add_bullet("Registro como responsable de tratamiento ante la AEPD (RGPD).")
 add_h2("5.2 Recursos humanos")
 
 add_para(
-    "Durante el primer año la plantilla se compone exclusivamente del promotor en doble rol "
-    "de administrador y desarrollador. A partir del segundo año, dependiendo de la captación "
-    "de clientes, se planifica la incorporación de un segundo desarrollador full-stack "
-    "(junior) y, en el tercer año, de un perfil comercial con conocimientos técnicos."
+    "Durante el primer año la plantilla se compone exclusivamente del promotor en doble "
+    "rol de administrador y desarrollador. A partir del segundo año, dependiendo de la "
+    "captación de clientes, se planifica la incorporación de un segundo desarrollador "
+    "full-stack (junior) y, en el tercer año, de un perfil comercial con conocimientos "
+    "técnicos."
 )
 
 add_table(
@@ -759,38 +876,39 @@ add_table(
 )
 
 add_para(
-    "La organización se diseña para ser plana, con reuniones semanales, uso intensivo de "
-    "herramientas de colaboración asíncrona (GitHub, Notion, Slack) y posibilidad de "
-    "teletrabajo total para reducir costes inmobiliarios y atraer talento más allá de la "
-    "zona geográfica del promotor."
+    "La organización se diseña para ser plana, con reuniones semanales, uso intensivo "
+    "de herramientas de colaboración asíncrona (GitHub, Notion, Slack) y posibilidad de "
+    "teletrabajo total para reducir costes inmobiliarios y atraer talento más allá de "
+    "la zona geográfica del promotor."
 )
 
 add_h2("5.3 Prevención de riesgos laborales")
 
 add_para(
-    "Aunque inicialmente la actividad se desarrolle en régimen de autónomo desde domicilio "
-    "o espacios de coworking, la incorporación futura de personal asalariado obliga al "
-    "cumplimiento de la Ley 31/1995 de Prevención de Riesgos Laborales. Los principales "
-    "riesgos identificados en una empresa de desarrollo software son:"
+    "Aunque inicialmente la actividad se desarrolle en régimen de autónomo desde "
+    "domicilio o espacios de coworking, la incorporación futura de personal asalariado "
+    "obliga al cumplimiento de la Ley 31/1995 de Prevención de Riesgos Laborales. Los "
+    "principales riesgos identificados en una empresa de desarrollo software son:"
 )
 add_bullet("Riesgos ergonómicos derivados del trabajo prolongado con pantallas (síndrome del túnel carpiano, dolor lumbar, fatiga visual).")
 add_bullet("Riesgo psicosocial por carga mental, plazos ajustados y trabajo aislado en remoto.")
 add_bullet("Riesgos eléctricos en puestos de trabajo.")
 
 add_para(
-    "Las medidas previstas incluyen la contratación de un Servicio de Prevención Ajeno que "
-    "realice la evaluación inicial de riesgos, la formación obligatoria al personal en uso "
-    "seguro de pantallas (Real Decreto 488/1997), la dotación de mobiliario ergonómico y la "
-    "planificación de pausas activas. En entorno de teletrabajo se aplicará la Ley 10/2021 "
-    "de trabajo a distancia, formalizando un acuerdo individual con cada trabajador."
+    "Las medidas previstas incluyen la contratación de un Servicio de Prevención Ajeno "
+    "que realice la evaluación inicial de riesgos, la formación obligatoria al personal "
+    "en uso seguro de pantallas (Real Decreto 488/1997), la dotación de mobiliario "
+    "ergonómico y la planificación de pausas activas. En entorno de teletrabajo se "
+    "aplicará la Ley 10/2021 de trabajo a distancia, formalizando un acuerdo individual "
+    "con cada trabajador."
 )
 
 add_h2("5.4 Análisis medioambiental")
 
 add_para(
-    "Aunque la actividad de desarrollo de software tiene un impacto medioambiental directo "
-    "limitado, sí existen consideraciones relevantes en el ciclo de vida de los servicios "
-    "cloud y en los hábitos de trabajo. Se adoptan las siguientes medidas:"
+    "Aunque la actividad de desarrollo de software tiene un impacto medioambiental "
+    "directo limitado, sí existen consideraciones relevantes en el ciclo de vida de los "
+    "servicios cloud y en los hábitos de trabajo. Se adoptan las siguientes medidas:"
 )
 add_bullet("Selección de proveedores cloud con compromiso de neutralidad de carbono.")
 add_bullet("Optimización del consumo de recursos para reducir el consumo energético del backend.")
@@ -801,8 +919,8 @@ add_bullet("Política de teletrabajo que reduce desplazamientos y emisiones de C
 add_h2("5.5 Plan de financiación")
 
 add_para(
-    "La financiación inicial necesaria para superar el periodo de pérdidas (años 1 y 2) se "
-    "estima en aproximadamente 30.000 €. El plan combina recursos propios y ajenos:"
+    "La financiación inicial necesaria para superar el periodo de pérdidas (años 1 y 2) "
+    "se estima en aproximadamente 30.000 €. El plan combina recursos propios y ajenos:"
 )
 
 add_table(
@@ -818,12 +936,12 @@ add_table(
 )
 
 add_para(
-    "Adicionalmente, se valora la solicitud de la Ayuda CDTI Neotec para empresas de base "
-    "tecnológica de hasta 250.000 € en caso de validación temprana del modelo. Los fondos "
-    "europeos Next Generation vinculados a la transformación digital también constituyen "
-    "una vía relevante a explorar a través del programa Kit Digital, que beneficia "
-    "indirectamente a SolveIT al subvencionar a sus clientes potenciales (PYME) en la "
-    "adopción de soluciones digitales como la nuestra (Red.es, 2024)."
+    "Adicionalmente, se valora la solicitud de la Ayuda CDTI Neotec para empresas de "
+    "base tecnológica de hasta 250.000 € en caso de validación temprana del modelo. "
+    "Los fondos europeos Next Generation vinculados a la transformación digital también "
+    "constituyen una vía relevante a explorar a través del programa Kit Digital, que "
+    "beneficia indirectamente a SolveIT al subvencionar a sus clientes potenciales "
+    "(PYME) en la adopción de soluciones digitales como la nuestra (Red.es, 2024)."
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -832,42 +950,43 @@ add_para(
 add_h1("6. EVALUACIÓN FUNCIONAL")
 
 add_para(
-    "La plataforma SolveIT ha sido desplegada en producción y se ha validado funcionalmente "
-    "sobre dos empresas piloto: SolveIT Demo (interna, 27 usuarios) y LKS Next (externa, 3 "
-    "usuarios). El soporte de evaluación es la propia aplicación corriendo sobre "
-    "infraestructura Railway. Los resultados de la verificación funcional se exponen a "
-    "continuación."
+    "La plataforma SolveIT ha sido desplegada en producción y se ha validado "
+    "funcionalmente sobre dos empresas piloto: SolveIT Demo (interna, 27 usuarios) y "
+    "LKS Next (externa, 3 usuarios). El soporte de evaluación es la propia aplicación "
+    "corriendo sobre infraestructura Railway. Los resultados de la verificación "
+    "funcional se exponen a continuación."
 )
 
 add_h3("Funcionalidades verificadas")
 
 add_para(
-    "Autenticación y gestión de usuarios. Se ha verificado el inicio de sesión, el cierre "
-    "de sesión, la recuperación de contraseña mediante código enviado por correo electrónico "
-    "(utilizando Resend como proveedor SMTP-API) y el control de acceso por roles "
-    "(superadmin, admin, technician, user). Los mensajes de error se muestran de forma "
-    "visible en la pantalla de login."
+    "Autenticación y gestión de usuarios. Se ha verificado el inicio de sesión, el "
+    "cierre de sesión, la recuperación de contraseña mediante código enviado por correo "
+    "electrónico (utilizando Resend como proveedor SMTP-API) y el control de acceso por "
+    "roles (superadmin, admin, technician, user). Los mensajes de error se muestran de "
+    "forma visible en la pantalla de login."
 )
 
 add_para(
     "Gestión de incidencias. Los usuarios pueden crear incidencias indicando título, "
-    "descripción, prioridad y categoría. El sistema asigna automáticamente al técnico con "
-    "menor carga de trabajo activa. Los técnicos cambian el estado de las incidencias entre "
-    "los valores open, in_progress, resolved y closed, y todos los cambios se registran en "
-    "el historial."
+    "descripción, prioridad y categoría. El sistema asigna automáticamente al técnico "
+    "con menor carga de trabajo activa. Los técnicos cambian el estado de las "
+    "incidencias entre los valores open, in_progress, resolved y closed, y todos los "
+    "cambios se registran en el historial."
 )
 
 add_para(
-    "Sistema de notificaciones. Cuando se crea una incidencia, el técnico asignado recibe "
-    "una notificación en la campanita de la aplicación. Cuando el estado cambia, el creador "
-    "de la incidencia es notificado. La tabla notifications incluye los campos title, body "
-    "y type para construir notificaciones tipadas y enriquecidas."
+    "Sistema de notificaciones. Cuando se crea una incidencia, el técnico asignado "
+    "recibe una notificación en la campanita de la aplicación. Cuando el estado cambia, "
+    "el creador de la incidencia es notificado. La tabla notifications incluye los "
+    "campos title, body y type para construir notificaciones tipadas y enriquecidas."
 )
 
 add_para(
-    "Base de conocimiento. Los administradores pueden crear, editar y eliminar artículos. "
-    "Los usuarios pueden valorar los artículos con una puntuación de 1 a 5 estrellas y "
-    "dejar reseñas. Los artículos están vinculados a categorías y soportan imágenes de portada."
+    "Base de conocimiento. Los administradores pueden crear, editar y eliminar "
+    "artículos. Los usuarios pueden valorar los artículos con una puntuación de 1 a 5 "
+    "estrellas y dejar reseñas. Los artículos están vinculados a categorías y soportan "
+    "imágenes de portada."
 )
 
 add_para(
@@ -877,25 +996,25 @@ add_para(
 )
 
 add_para(
-    "Asistente de inteligencia artificial. Se ha integrado el modelo Gemma 3 12B mediante "
-    "la API gratuita de Google Generative Language. El asistente recibe la pregunta del "
-    "usuario y, opcionalmente, contexto de la base de conocimiento, y devuelve una respuesta "
-    "detallada en español. El acceso al asistente se realiza mediante un botón flotante "
-    "(FAB) presente en todas las pantallas principales."
+    "Asistente de inteligencia artificial. Se ha integrado el modelo Gemma 3 12B "
+    "mediante la API gratuita de Google Generative Language. El asistente recibe la "
+    "pregunta del usuario y, opcionalmente, contexto de la base de conocimiento, y "
+    "devuelve una respuesta detallada en español. El acceso al asistente se realiza "
+    "mediante un botón flotante (FAB) presente en todas las pantallas principales."
 )
 
 add_para(
-    "Arquitectura multi-tenant. Cada fila de las tablas incidents, users, knowledge_base, "
-    "forum_posts y notifications incluye un campo company_id que se filtra automáticamente "
-    "en cada consulta a través del middleware tenant.js. Se ha verificado que un "
-    "administrador de la empresa A no puede ver datos de la empresa B aunque manipule el "
-    "token JWT."
+    "Arquitectura multi-tenant. Cada fila de las tablas incidents, users, "
+    "knowledge_base, forum_posts y notifications incluye un campo company_id que se "
+    "filtra automáticamente en cada consulta a través del middleware tenant.js. Se ha "
+    "verificado que un administrador de la empresa A no puede ver datos de la empresa B "
+    "aunque manipule el token JWT."
 )
 
 add_para(
-    "Panel de SuperAdmin. Permite al desarrollador (rol superadmin) crear nuevas empresas "
-    "cliente, asignar el plan contratado (Basic, Pro o Enterprise), activar o desactivar "
-    "empresas y crear el usuario administrador inicial."
+    "Panel de SuperAdmin. Permite al desarrollador (rol superadmin) crear nuevas "
+    "empresas cliente, asignar el plan contratado (Basic, Pro o Enterprise), activar o "
+    "desactivar empresas y crear el usuario administrador inicial."
 )
 
 add_h3("Métricas y herramientas de validación")
@@ -915,7 +1034,7 @@ add_table(
         ["Aplicación web responsive", "✓ Desplegada en Railway"],
         ["Backend API REST", "✓ 11 grupos de rutas operativos"],
         ["Multi-tenant con aislamiento real", "✓ Verificado con dos empresas"],
-        ["Asistente IA integrado", "✓ Gemma 3 12B funcionando en producción"],
+        ["Asistente IA integrado", "✓ Gemma 3 12B funcionando"],
         ["Recuperación de contraseña", "✓ Resend operativo"],
         ["Sistema de notificaciones", "✓ Funcionando en tiempo real"],
         ["Documentación visual de soporte", "✓ Capturas y vídeo demostrativo"],
@@ -923,9 +1042,9 @@ add_table(
 )
 
 add_para(
-    "Todos los objetivos planteados al inicio del proyecto se han alcanzado satisfactoriamente, "
-    "lo que permite afirmar que la plataforma es funcionalmente válida para su comercialización "
-    "a clientes piloto."
+    "Todos los objetivos planteados al inicio del proyecto se han alcanzado "
+    "satisfactoriamente, lo que permite afirmar que la plataforma es funcionalmente "
+    "válida para su comercialización a clientes piloto."
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -934,59 +1053,63 @@ add_para(
 add_h1("7. CONCLUSIÓN")
 
 add_para(
-    "El presente trabajo ha consistido en el diseño, desarrollo, despliegue y validación de "
-    "SolveIT, una plataforma SaaS multi-tenant para la gestión de incidencias informáticas "
-    "en pequeñas y medianas empresas. A lo largo del proyecto se ha cubierto el ciclo "
-    "completo de un producto software, desde la identificación de la necesidad de mercado "
-    "hasta la puesta en producción real con clientes piloto."
+    "El presente trabajo ha consistido en el diseño, desarrollo, despliegue y "
+    "validación de SolveIT, una plataforma SaaS multi-tenant para la gestión de "
+    "incidencias informáticas en pequeñas y medianas empresas. A lo largo del proyecto "
+    "se ha cubierto el ciclo completo de un producto software, desde la identificación "
+    "de la necesidad de mercado hasta la puesta en producción real con clientes piloto."
 )
 
 add_para(
-    "Las principales aportaciones del trabajo son tres. En primer lugar, se demuestra que "
-    "es viable construir un producto SaaS completo y profesional con un stack mayoritariamente "
-    "abierto y servicios cloud gratuitos o de bajo coste, abriendo la puerta a que otros "
-    "emprendedores con recursos limitados aborden proyectos de complejidad similar. En "
-    "segundo lugar, se valida que la integración de inteligencia artificial generativa en "
-    "productos B2B no es solo un reclamo de marketing sino una funcionalidad que aporta "
-    "valor real reduciendo la carga del equipo de soporte. En tercer lugar, se confirma que "
-    "el modelo multi-tenant basado en discriminador por columna es suficiente para los "
-    "volúmenes esperados en el segmento PYME, sin necesidad de bases de datos separadas por cliente."
+    "Las principales aportaciones del trabajo son tres. En primer lugar, se demuestra "
+    "que es viable construir un producto SaaS completo y profesional con un stack "
+    "mayoritariamente abierto y servicios cloud gratuitos o de bajo coste, abriendo la "
+    "puerta a que otros emprendedores con recursos limitados aborden proyectos de "
+    "complejidad similar. En segundo lugar, se valida que la integración de "
+    "inteligencia artificial generativa en productos B2B no es solo un reclamo de "
+    "marketing sino una funcionalidad que aporta valor real reduciendo la carga del "
+    "equipo de soporte. En tercer lugar, se confirma que el modelo multi-tenant basado "
+    "en discriminador por columna es suficiente para los volúmenes esperados en el "
+    "segmento PYME, sin necesidad de bases de datos separadas por cliente."
 )
 
 add_para(
     "A nivel personal y profesional, el trabajo ha permitido consolidar las competencias "
-    "adquiridas durante el ciclo formativo, especialmente en programación de servicios y "
-    "procesos, acceso a datos, programación multimedia y dispositivos móviles. La integración "
-    "end-to-end de tecnologías heterogéneas (backend, frontend web, móvil, IA, cloud) refleja "
-    "el perfil profesional demandado actualmente en el mercado laboral."
+    "adquiridas durante el ciclo formativo, especialmente en programación de servicios "
+    "y procesos, acceso a datos, programación multimedia y dispositivos móviles. La "
+    "integración end-to-end de tecnologías heterogéneas (backend, frontend web, móvil, "
+    "IA, cloud) refleja el perfil profesional demandado actualmente en el mercado "
+    "laboral."
 )
 
 add_para(
-    "El proyecto está alineado con la Agenda 2030 y los Objetivos de Desarrollo Sostenible, "
-    "especialmente el ODS 8, el ODS 9 y el ODS 12, al contribuir a la digitalización del "
-    "tejido empresarial español, mejorar la productividad de los trabajadores y democratizar "
-    "el acceso a herramientas IT que tradicionalmente solo estaban al alcance de grandes "
-    "corporaciones. Se sitúa, asimismo, en el ámbito de las economías transformadoras al "
-    "ofrecer un producto accesible que reduce la brecha tecnológica entre PYME y grandes empresas."
+    "El proyecto está alineado con la Agenda 2030 y los Objetivos de Desarrollo "
+    "Sostenible, especialmente el ODS 8, el ODS 9 y el ODS 12, al contribuir a la "
+    "digitalización del tejido empresarial español, mejorar la productividad de los "
+    "trabajadores y democratizar el acceso a herramientas IT que tradicionalmente solo "
+    "estaban al alcance de grandes corporaciones. Se sitúa, asimismo, en el ámbito de "
+    "las economías transformadoras al ofrecer un producto accesible que reduce la "
+    "brecha tecnológica entre PYME y grandes empresas."
 )
 
 add_para(
     "Como líneas futuras de trabajo se proponen las siguientes: la incorporación de un "
-    "módulo de gestión de activos (CMDB) que permita asociar incidencias con dispositivos "
-    "y software concretos; la integración con Microsoft Teams y Slack para crear y consultar "
-    "tickets desde el chat corporativo; el desarrollo de una API pública que permita a "
-    "clientes con necesidades específicas integrar SolveIT con sus sistemas internos; y la "
-    "incorporación de un módulo de SLA (Service Level Agreement) para empresas que necesiten "
-    "garantías formales de tiempos de respuesta."
+    "módulo de gestión de activos (CMDB) que permita asociar incidencias con "
+    "dispositivos y software concretos; la integración con Microsoft Teams y Slack "
+    "para crear y consultar tickets desde el chat corporativo; el desarrollo de una API "
+    "pública que permita a clientes con necesidades específicas integrar SolveIT con "
+    "sus sistemas internos; y la incorporación de un módulo de SLA (Service Level "
+    "Agreement) para empresas que necesiten garantías formales de tiempos de respuesta."
 )
 
 add_para(
-    "Para abrir el debate con el tribunal se plantean las siguientes preguntas. ¿Hasta qué "
-    "punto el uso de modelos de IA gratuitos pero externos compromete la sostenibilidad a "
-    "largo plazo de un producto SaaS? ¿Es ética la asignación automática de incidencias al "
-    "técnico con menor carga si esto puede generar desigualdades en la valoración del "
-    "rendimiento de los empleados? ¿Cómo debe SolveIT evolucionar para cumplir con los "
-    "requisitos del próximo Reglamento Europeo de Inteligencia Artificial?"
+    "Para abrir el debate con el tribunal se plantean las siguientes preguntas. "
+    "¿Hasta qué punto el uso de modelos de IA gratuitos pero externos compromete la "
+    "sostenibilidad a largo plazo de un producto SaaS? ¿Es ética la asignación "
+    "automática de incidencias al técnico con menor carga si esto puede generar "
+    "desigualdades en la valoración del rendimiento de los empleados? ¿Cómo debe "
+    "SolveIT evolucionar para cumplir con los requisitos del próximo Reglamento Europeo "
+    "de Inteligencia Artificial?"
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1012,6 +1135,7 @@ referencias = [
 ]
 for ref in referencias:
     p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     p.paragraph_format.left_indent = Cm(1.25)
     p.paragraph_format.first_line_indent = Cm(-1.25)
     p.paragraph_format.space_after = Pt(6)
@@ -1026,23 +1150,24 @@ add_h1("9. ANEXOS")
 
 add_h2("Anexo I. Capturas de pantalla de la aplicación")
 add_para(
-    "[Insertar aquí capturas de las pantallas principales: login, lista de incidencias, "
-    "detalle de incidencia, base de conocimiento, foro, asistente IA, panel SuperAdmin]",
+    "[INSERTAR AQUÍ las capturas de las pantallas principales: login, lista de "
+    "incidencias, detalle de incidencia, base de conocimiento, foro, asistente IA, "
+    "panel SuperAdmin]",
     italic=True
 )
 
 add_h2("Anexo II. Diagrama de la arquitectura")
 add_para(
-    "[Insertar aquí diagrama mostrando: app móvil → API REST (Railway) → PostgreSQL, con "
-    "conexiones externas a Resend (email) y Google Gemini (IA)]",
+    "[INSERTAR AQUÍ el diagrama mostrando: app móvil → API REST (Railway) → PostgreSQL, "
+    "con conexiones externas a Resend (email) y Google Gemini (IA)]",
     italic=True
 )
 
 add_h2("Anexo III. Modelo entidad-relación de la base de datos")
 add_para(
-    "[Insertar aquí diagrama ER con tablas: companies, users, incidents, comments, "
-    "incident_history, notifications, knowledge_base, knowledge_ratings, forum_posts, "
-    "forum_comments, forum_reactions, password_resets, ai_conversations]",
+    "[INSERTAR AQUÍ el diagrama ER con las tablas: companies, users, incidents, "
+    "comments, incident_history, notifications, knowledge_base, knowledge_ratings, "
+    "forum_posts, forum_comments, forum_reactions, password_resets, ai_conversations]",
     italic=True
 )
 
@@ -1067,5 +1192,5 @@ add_table(
 # ─────────────────────────────────────────────────────────────────────────────
 # Guardar
 # ─────────────────────────────────────────────────────────────────────────────
-doc.save(OUTPUT)
-print(f"OK - Documento generado en: {OUTPUT}")
+doc.save(OUTPUT_DOCX)
+print(f"OK Word generado: {OUTPUT_DOCX}")
