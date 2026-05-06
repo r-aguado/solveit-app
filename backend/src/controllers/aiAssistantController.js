@@ -34,13 +34,15 @@ const askAI = async (req, res) => {
 
     prompt += `\nPregunta del usuario: ${question}`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-12b-it:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${apiKey}`;
 
     const response = await axios.post(url, {
       contents: [{ parts: [{ text: prompt }] }]
     }, { timeout: 30000 });
 
-    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Filtrar parts internos de "thought" y quedarnos con la respuesta visible
+    const parts = response.data?.candidates?.[0]?.content?.parts || [];
+    const text = parts.filter(p => !p.thought).map(p => p.text).join('').trim();
 
     if (!text) {
       console.error('Respuesta sin texto:', JSON.stringify(response.data));
